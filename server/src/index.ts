@@ -24,10 +24,10 @@ app.use('/api/daily-challenge', dailyRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/case-log', caseLogRouter);
 
-// Serve built frontend in production
-app.use(express.static(path.join(process.cwd(), 'client', 'dist')));
+// Serve built frontend in production — client/dist lives at repo root, not inside server/
+app.use(express.static(path.join(process.cwd(), '..', 'client', 'dist')));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(process.cwd(), 'client', 'dist', 'index.html'));
+  res.sendFile(path.join(process.cwd(), '..', 'client', 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
