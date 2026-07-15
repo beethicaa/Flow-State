@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGenerate } from '../../hooks/useGenerate';
 import { shuffle } from '../../constants';
+import GameLayout, { LoadingState, ErrorState, Stamp } from '../GameLayout';
 
 interface Option { text: string; note: string; }
 interface RawOption { text: string; correct: boolean; note: string; }
@@ -52,49 +53,41 @@ Put the correct option at a RANDOM index (0-3). NEVER put it at the same positio
   const showLoading = loading && !data;
   const showError = error && !data;
 
+  if (showLoading) return <LoadingState message="Pulling up the dashboard…" />;
+  if (showError) return <ErrorState message={error} onRetry={loadScenario} />;
+  if (!data || options.length === 0) return null;
+
   return (
-    <>
-      {showLoading && (
-        <div className="loader"><div className="spinner"></div><div className="msg">Pulling up the dashboard…</div></div>
-      )}
-      {showError && (
-        <div className="error-box">{error}<br /><br /><button className="btn btn-red" onClick={loadScenario}>Try again</button></div>
-      )}
-      {data && options.length > 0 && (
+    <GameLayout title="Metrics Detective" subtitle="Analytics" icon="📈" iconBg="bg-gradient-to-br from-red to-red/60">
+      <div className="metric-tile">
+        <div className="mname">{data.product} · {data.metricName}</div>
+        <div className="mval">↓ {data.metricChange}</div>
+        <div className="mctx">{data.context}</div>
+      </div>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>What's the most likely root cause?</div>
+      <div className="hyp-list">
+        {options.map((o, i) => {
+          let cls = 'hyp-card';
+          if (selected !== null) {
+            cls += ' revealed';
+            if (i === correctIndex) cls += ' correct';
+            else if (i === selected) cls += ' incorrect';
+            cls += ' locked';
+          }
+          return (
+            <div key={i} className={cls} onClick={() => handlePick(i)}>
+              {o.text}
+              <div className="note">{o.note}</div>
+            </div>
+          );
+        })}
+      </div>
+      {selected !== null && (
         <>
-          <div className="metric-tile">
-            <div className="mname">{data.product} · {data.metricName}</div>
-            <div className="mval">↓ {data.metricChange}</div>
-            <div className="mctx">{data.context}</div>
-          </div>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>What's the most likely root cause?</div>
-          <div className="hyp-list">
-            {options.map((o, i) => {
-              let cls = 'hyp-card';
-              if (selected !== null) {
-                cls += ' revealed';
-                if (i === correctIndex) cls += ' correct';
-                else if (i === selected) cls += ' incorrect';
-                cls += ' locked';
-              }
-              return (
-                <div key={i} className={cls} onClick={() => handlePick(i)}>
-                  {o.text}
-                  <div className="note">{o.note}</div>
-                </div>
-              );
-            })}
-          </div>
-          {selected !== null && (
-            <>
-              <div className={`stamp ${selected === correctIndex ? 'stamp-correct' : 'stamp-incorrect'}`}>
-                {selected === correctIndex ? 'Nailed it' : 'Missed it'}
-              </div>
-              <div style={{ marginTop: 8 }}><button className="btn btn-primary" onClick={loadScenario}>Next case →</button></div>
-            </>
-          )}
+          <Stamp tier={selected === correctIndex ? 'high' : 'low'} label={selected === correctIndex ? 'Nailed it' : 'Missed it'} xp={selected === correctIndex ? 30 : 10} />
+          <div style={{ marginTop: 8 }}><button className="btn btn-primary" onClick={loadScenario}>Next case →</button></div>
         </>
       )}
-    </>
+    </GameLayout>
   );
 }
