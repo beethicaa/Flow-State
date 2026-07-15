@@ -1,0 +1,229 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #EEF1F4;
+    color: #1B2430;
+    background-image:
+      linear-gradient(rgba(58, 110, 165, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(58, 110, 165, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: -1px -1px;
+  }
+}
+
+@layer components {
+  .font-display { font-family: 'Space Grotesk', sans-serif; }
+  .font-body { font-family: 'Inter', sans-serif; }
+  .font-hand { font-family: 'Caveat', cursive; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .game-card {
+    @apply relative overflow-hidden transition-all duration-200;
+  }
+  .game-card:hover {
+    transform: translateY(-4px);
+    @apply shadow-lg;
+  }
+  .game-card:active {
+    transform: translateY(-1px) scale(0.99);
+  }
+
+  .game-card-metrics {
+    background: linear-gradient(145deg, #1B2430 0%, #2a3548 100%);
+    @apply border-0 text-white;
+  }
+  .game-card-metrics .game-squiggle {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    opacity: 0.2;
+    font-size: 40px;
+    color: #E63946;
+  }
+
+  .game-card-guesstimate {
+    background: #FBF9F2;
+    background-image: repeating-linear-gradient(transparent, transparent 23px, rgba(26, 36, 48, 0.08) 24px);
+    @apply border-2 border-ink/10;
+  }
+  .game-card-guesstimate .game-hand-icon {
+    position: absolute;
+    bottom: 4px;
+    right: 12px;
+    font-size: 36px;
+    font-weight: 700;
+    color: #1B2430;
+    opacity: 0.15;
+    font-family: 'Caveat', cursive;
+  }
+
+  .game-card-prioritize {
+    background: #FFD23F;
+    transform: rotate(-1.5deg);
+    @apply border-0 shadow-md;
+  }
+  .game-card-prioritize:hover {
+    transform: rotate(-1.5deg) translateY(-4px);
+  }
+  .game-card-prioritize::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 6px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 0 0 2px 2px;
+  }
+
+  .game-card-sprint {
+    background: #FFFFFF;
+    @apply border-2 border-blue/20;
+  }
+  .game-card-sprint .game-pencil {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 32px;
+    opacity: 0.15;
+    transform: rotate(-15deg);
+  }
+
+  .game-card-abtest {
+    background: linear-gradient(180deg, #1B2430 0%, #2a3548 100%);
+    @apply border-0 text-white;
+  }
+  .game-card-abtest .game-chart {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    opacity: 0.2;
+  }
+  .game-card-abtest .game-chart span {
+    width: 8px;
+    background: #3A6EA5;
+    border-radius: 2px 2px 0 0;
+  }
+
+  .game-card-crisis {
+    background: linear-gradient(135deg, #E63946 0%, #c62e3a 100%);
+    @apply border-0 text-white;
+  }
+  .game-card-crisis .game-pulse {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-radius: 50%;
+    opacity: 0.4;
+    animation: pulse 2s infinite;
+  }
+
+  .game-card-northstar {
+    background: #FFFFFF;
+    @apply border-2 border-amber/30;
+  }
+  .game-card-northstar .game-compass {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 32px;
+    opacity: 0.15;
+  }
+
+  .game-card-standoff {
+    background: #FBF9F2;
+    @apply border-2 border-purple/20;
+  }
+  .game-card-standoff .game-chat {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 28px;
+    opacity: 0.15;
+  }
+
+  .badge-tier {
+    @apply relative rounded-xl shadow-lg flex flex-col items-center justify-center text-white transition-all duration-500;
+    width: 64px;
+    height: 88px;
+  }
+  .badge-tier::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    width: 20px;
+    height: 8px;
+    background: #4a5568;
+    border-radius: 2px 2px 0 0;
+  }
+  .badge-tier::after {
+    content: '●';
+    position: absolute;
+    top: -6px;
+    width: 6px;
+    height: 6px;
+    color: #94a3b8;
+    font-size: 6px;
+  }
+
+  .stamp-correct {
+    animation: stampIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center;
+    transform: rotate(-8deg) scale(0);
+  }
+  .stamp-incorrect {
+    animation: stampIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center;
+    transform: rotate(5deg) scale(0);
+  }
+
+  @keyframes stampIn {
+    0% { transform: rotate(-8deg) scale(0); opacity: 0; }
+    60% { transform: rotate(-8deg) scale(1.1); opacity: 1; }
+    100% { transform: rotate(-4deg) scale(1); opacity: 1; }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+
+  .xp-float {
+    animation: floatUp 0.8s ease-out forwards;
+    position: fixed;
+    z-index: 50;
+    pointer-events: none;
+  }
+  @keyframes floatUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-60px) scale(1.2); opacity: 0; }
+  }
+
+  .streak-flame {
+    display: inline-block;
+    animation: flicker 0.3s infinite alternate;
+  }
+  @keyframes flicker {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stamp-correct, .stamp-incorrect, .xp-float, .streak-flame, .game-card:hover, .game-card:active, .badge-tier, .game-card-crisis .game-pulse {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
+    }
+  }
+}
