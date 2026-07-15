@@ -7,7 +7,7 @@
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "build": "cd client && npm install && cd client && npm run build",
+    "build": "cd client && npm install && npm run build",
     "start": "cd server && npm start",
     "start:prod": "NODE_ENV=production cd server && npm start"
   },
