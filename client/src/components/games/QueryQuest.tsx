@@ -94,7 +94,7 @@ export default function QueryQuest({ onComplete }: { onComplete: (xp: number, sk
             <p className="mt-2"><strong>Explanation grade:</strong> {result.explanationScore}/50 — {result.feedback}</p>
             <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200">
               <strong className="text-green-700">Corrected Query:</strong>
-              <pre className="mt-2 text-sm font-mono overflow-x-auto text-white">{scenario.correctedQuery}</pre>
+              <pre className="mt-2 text-sm font-mono overflow-x-auto text-black">{scenario.correctedQuery}</pre>
             </div>
             <p className="mt-3 text-ink-soft italic">{scenario.whatWentUnnoticed}</p>
             <div className="mt-4 p-3 rounded-lg bg-blue-50">
