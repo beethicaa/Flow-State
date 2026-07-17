@@ -5,6 +5,24 @@ interface GenerateOptions {
   prompt: string;
 }
 
+function getDifficulty(): number {
+  try {
+    const raw = localStorage.getItem('flowstate_profile');
+    if (!raw) return 0;
+    const p = JSON.parse(raw);
+    const xp = p.xp || 0;
+    if (xp >= 3200) return 6;
+    if (xp >= 2200) return 5;
+    if (xp >= 1400) return 4;
+    if (xp >= 800) return 3;
+    if (xp >= 400) return 2;
+    if (xp >= 150) return 1;
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function useGenerate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,10 +47,15 @@ export function useGenerate() {
     setErrorType(null);
 
     try {
+      const diff = getDifficulty();
+      const labels = ['beginner-friendly Associate PM level', 'Product Manager level', 'Senior PM level', 'Group PM level', 'Director of Product level', 'VP of Product level', 'Chief Product Officer level'];
+      const systemWithDiff = opts.system + `\n\nPlayer tier: ${labels[diff]}. Make this scenario appropriately ${diff <= 1 ? 'straightforward with clear signals' : diff <= 3 ? 'nuanced with competing trade-offs and ambiguity' : 'complex with subtle traps, multi-stakeholder politics, and no obvious answer'}.`;
+      const body = { system: systemWithDiff, prompt: opts.prompt };
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(opts),
+        body: JSON.stringify(body),
         signal: controller.signal
       });
 
