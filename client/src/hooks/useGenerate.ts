@@ -1,27 +1,18 @@
-import { useState, useRef, useCallback } from 'react';
+// === TEMPLATE-BASED GENERATION (no API calls) ===
+// All scenario generation is now client-side via curated template pools.
+// This hook still provides the same interface but returns instantly.
+
+import { useState, useCallback } from 'react';
 
 interface GenerateOptions {
   system: string;
   prompt: string;
 }
 
-interface GenerateState {
-  loading: boolean;
-  error: string | null;
-  errorType: string | null;
-}
-
-interface UseGenerateReturn extends GenerateState {
-  generate: (opts: GenerateOptions) => Promise<any>;
-  reset: () => void;
-}
-
-export function useGenerate(): UseGenerateReturn {
+export function useGenerate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
-  const aborterRef = useRef<AbortController | null>(null);
-  const inflightRef = useRef(false);
 
   const reset = useCallback(() => {
     setError(null);
@@ -29,57 +20,49 @@ export function useGenerate(): UseGenerateReturn {
   }, []);
 
   const generate = useCallback(async (opts: GenerateOptions): Promise<any> => {
-    // Refuse duplicate in-flight — but always allow a fresh call after completion
-    if (inflightRef.current) return null;
-
-    if (aborterRef.current) {
-      aborterRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    aborterRef.current = controller;
-    inflightRef.current = true;
     setLoading(true);
     setError(null);
     setErrorType(null);
 
+    // Simulate a tiny delay so loading states flash briefly (good UX)
+    await new Promise(r => setTimeout(r, 100));
+
+    setLoading(false);
+
+    // Parse the system prompt to determine which game generator to use
+    const sys = opts.system.toLowerCase();
+
+    // Dynamic import of scenario generators
+    const scenarios = await import('../scenarios/index');
+
     try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(opts),
-        signal: controller.signal
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        const type = data.errorType || 'network';
-        const messages: Record<string, string> = {
-          rate_limited: 'A lot of requests right now — give it a few seconds.',
-          invalid_response: 'That one didn\'t generate cleanly — try again.',
-          timeout: 'The generation timed out. Try a simpler prompt or try again.',
-          network: 'Could not reach the server. Check your connection.',
-          invalid_request: 'Something was wrong with the request. Let\'s try again.'
-        };
-        throw { errorType: type, message: messages[type] || 'Failed to generate.' };
+      if (sys.includes('analytics case') || sys.includes('diagnostic') || sys.includes('metric')) {
+        return scenarios.generateMetricsDetective();
+      }
+      if (sys.includes('fermi') || sys.includes('estimation') || sys.includes('guess') || sys.includes('guesstimate')) {
+        return scenarios.generateGuesstimate();
+      }
+      if (sys.includes('backlog') || sys.includes('priorit')) {
+        return scenarios.generatePrioritize();
+      }
+      if (sys.includes('experiment') || sys.includes('ab test') || sys.includes('autopsy')) {
+        return scenarios.generateABTest();
+      }
+      if (sys.includes('incident') || sys.includes('crisis') || sys.includes('p0')) {
+        return scenarios.generateCrisis();
+      }
+      if (sys.includes('north star') || sys.includes('business model') || sys.includes('metric selection')) {
+        return scenarios.generateNorthStar();
+      }
+      if (sys.includes('stakeholder') || sys.includes('standoff') || sys.includes('influence')) {
+        return scenarios.generateStandoff();
       }
 
-      inflightRef.current = false;
-      setLoading(false);
-      return data.result;
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        inflightRef.current = false;
-        setLoading(false);
-        return null;
-      }
-      const type = err?.errorType || 'network';
-      const msg = err?.message || 'Failed to generate scenario.';
-      setError(msg);
-      setErrorType(type);
-      inflightRef.current = false;
-      setLoading(false);
+      // Default — return a generic metrics detective scenario as fallback
+      return scenarios.generateMetricsDetective();
+    } catch (e) {
+      setError('Could not generate scenario. Try again.');
+      setErrorType('fallback');
       return null;
     }
   }, []);

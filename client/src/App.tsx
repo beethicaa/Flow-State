@@ -116,8 +116,12 @@ function App() {
         {/* Header row */}
         <div className="header-row flex flex-col md:flex-row justify-between items-center gap-4 mb-5">
           <div>
-            <div className="eyebrow" style={{ fontSize: 12, letterSpacing: '.14em', color: 'var(--ink-soft)', fontWeight: 600, textTransform: 'uppercase' }}>PM Skills, Gamified</div>
-            <h1 style={{ fontSize: 30, letterSpacing: '-.02em' }}>Flow State</h1>
+            <div style={{ fontSize: 11, letterSpacing: '.16em', color: 'var(--blue)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>PM Skills, Gamified</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ fontSize: 32, letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, margin: 0 }}>Flow State</h1>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)', marginTop: 4, opacity: 0.8 }} />
+            </div>
+            <div style={{ width: 32, height: 3, background: 'var(--blue)', borderRadius: 2, marginTop: 6, opacity: 0.4 }} />
           </div>
           <div style={{ position: 'relative' }}>
             <div className="lanyard"></div>
