@@ -35,6 +35,7 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
   padding:7px 14px;border-radius:6px;font-weight:600;font-size:13px;
   box-shadow:2px 2px 0 var(--shadow);
   transition:transform .12s ease, box-shadow .12s ease;
+  align-self:flex-start;
 }
 .btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--shadow);}
 .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--shadow);}
