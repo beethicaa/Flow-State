@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { randomModifier } from '../scenarios/index';
 
 interface GenerateOptions {
   system: string;
@@ -50,7 +51,8 @@ export function useGenerate() {
       const diff = getDifficulty();
       const labels = ['beginner-friendly Associate PM level', 'Product Manager level', 'Senior PM level', 'Group PM level', 'Director of Product level', 'VP of Product level', 'Chief Product Officer level'];
       const systemWithDiff = opts.system + `\n\nPlayer tier: ${labels[diff]}. Make this scenario appropriately ${diff <= 1 ? 'straightforward with clear signals' : diff <= 3 ? 'nuanced with competing trade-offs and ambiguity' : 'complex with subtle traps, multi-stakeholder politics, and no obvious answer'}.`;
-      const body = { system: systemWithDiff, prompt: opts.prompt };
+      const modifier = randomModifier();
+      const body = { system: systemWithDiff, prompt: opts.prompt + '\n\nAdditional instruction: ' + modifier };
 
       const res = await fetch('/api/generate', {
         method: 'POST',
