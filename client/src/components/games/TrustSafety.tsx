@@ -1,14 +1,26 @@
 import { useState, useEffect } from 'react';
-import { useGenerate } from '../../hooks/useGenerate';
-import GameLayout, { LoadingState, ErrorState, JudgmentScore } from '../GameLayout';
+import GameLayout, { LoadingState, JudgmentScore } from '../GameLayout';
+import { trustSafetyPool } from '../../scenarios/index';
+import { useStorage } from '../../hooks/useStorage';
 
 export default function TrustSafety({ onComplete }: { onComplete: (xp: number, skill: string) => void }) {
-  const { generate, loading, error, reset } = useGenerate();
   const [scenario, setScenario] = useState<any>(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState<'play' | 'grade'>('play');
   const [result, setResult] = useState<any>(null);
   const genRef = { current: false };
+  const { profile } = useStorage();
+
+  function getTier(): number {
+    const xp = profile?.xp || 0;
+    if (xp >= 3200) return 6;
+    if (xp >= 2200) return 5;
+    if (xp >= 1400) return 4;
+    if (xp >= 800) return 3;
+    if (xp >= 400) return 2;
+    if (xp >= 150) return 1;
+    return 0;
+  }
 
   useEffect(() => {
     if (!genRef.current) {
@@ -17,65 +29,69 @@ export default function TrustSafety({ onComplete }: { onComplete: (xp: number, s
     }
   }, []);
 
-  const loadScenario = async () => {
-    reset();
+  function loadScenario() {
     setScenario(null);
     setAnswer('');
     setPhase('play');
     setResult(null);
-    const r = await generate({
-      system: 'You design product ethics / trust-and-safety trade-off exercises for senior PM practice. No clean right answer.',
-      prompt: `Invent a feature with clear upside and a real safety/ethical concern (vary the domain each time). Output JSON:
-{
-  "product": "short context",
-  "feature": "the feature under consideration",
-  "upside": "the metric/business impact if shipped as-is",
-  "concern": "the specific safety/privacy/ethical issue, stated seriously",
-  "stakeholderPressure": "1 sentence on who's pushing to ship anyway",
-  "strongAnswerLooksLike": "2-3 sentences on what a thoughtful decision would weigh"
-}`
-    });
-    if (r) setScenario(r);
-  };
+    const tier = getTier();
+    const eligible = trustSafetyPool.filter(s => s.difficulty.min <= tier && s.difficulty.max >= tier);
+    if (eligible.length === 0) {
+      setScenario(trustSafetyPool[Math.floor(Math.random() * trustSafetyPool.length)]);
+    } else {
+      setScenario(eligible[Math.floor(Math.random() * eligible.length)]);
+    }
+  }
 
-  const handleSubmit = async () => {
+  function handleSubmit() {
     if (!answer.trim() || !scenario) return;
-    const gradeResult = await generate({
-      system: 'Grade an ethics trade-off answer. Return JSON with scores.',
-      prompt: `Scenario: ${scenario.feature}\nUpside: ${scenario.upside}\nConcern: ${scenario.concern}\nStrong answer: ${scenario.strongAnswerLooksLike}\nPlayer answer: ${answer}\nRate 0-33 each on ethicalReasoning, businessPragmatism, mitigationConcreteness. JSON: { "scores": { "ethicalReasoning": number, "businessPragmatism": number, "mitigationConcreteness": number }, "debrief": "2-3 sentences", "judgmentScore": number }`
+    const lower = answer.toLowerCase();
+    const matchedCategories = scenario.policyCategories.filter((c: string) => lower.includes(c.toLowerCase().slice(0, 15)));
+    const matchRate = matchedCategories.length / Math.max(scenario.policyCategories.length, 1);
+    const hasMitigation = lower.includes('mitigat') || lower.includes('balance') || lower.includes('trade') || lower.includes('allow') || lower.includes('restrict');
+    const ethicalReasoning = Math.round(33 * Math.min(1, matchRate + 0.4));
+    const businessPragmatism = Math.round(33 * (hasMitigation ? 0.8 : 0.3));
+    const mitigationConcreteness = Math.round(33 * Math.min(1, matchRate + 0.3));
+    const scores = { ethicalReasoning, businessPragmatism, mitigationConcreteness };
+    const judgmentScore = Math.round((ethicalReasoning + businessPragmatism + mitigationConcreteness) / 3);
+    const xp = Math.max(10, Math.round(judgmentScore / 100 * 30));
+    const topPolicies = scenario.policyCategories.slice(0, 2).join(', ');
+    setResult({
+      scores,
+      debrief: `A strong decision weighs both the upside and the specific policy concerns: ${topPolicies}. The best answers don't just pick a side — they propose a concrete mitigation that preserves value while reducing harm.`,
+      judgmentScore, xp
     });
-    const s = gradeResult?.scores || { ethicalReasoning: 0, businessPragmatism: 0, mitigationConcreteness: 0 };
-    const judgmentScore = gradeResult?.judgmentScore || Math.round((s.ethicalReasoning + s.businessPragmatism + s.mitigationConcreteness) / 3);
-    const xp = Math.round(judgmentScore / 100 * 30);
-    setResult({ scores: s, debrief: gradeResult?.debrief || '', judgmentScore, xp });
     setPhase('grade');
-    onComplete(Math.max(10, xp), 'strategy');
-  };
+    onComplete(xp, 'strategy');
+  }
+
+  if (!scenario) return <LoadingState message="Generating an ethical dilemma…" />;
 
   return (
     <GameLayout title="Trust & Safety Dilemma" subtitle="Strategy" icon="⚖️" iconBg="bg-amber-600">
-      {loading && !scenario && <LoadingState message="Generating an ethical dilemma…" />}
-      {error && !scenario && <ErrorState message={error} onRetry={loadScenario} />}
       {scenario && phase === 'play' && (
         <div>
           <div className="panel mb-4" style={{ borderLeft: '4px solid var(--amber)', background: '#FFFDF5' }}>
-            <p className="text-sm text-ink-soft">{scenario.product}</p>
-            <p className="mt-2 font-bold">{scenario.feature}</p>
+            <p className="text-sm font-medium">{scenario.issue}</p>
+            <p className="text-xs text-ink-soft mt-1">Severity: <span className="font-semibold">{scenario.severity}</span> &middot; Category: {scenario.contentCategory}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="p-3 rounded-lg" style={{ background: '#E4F5EF' }}>
               <strong className="text-green-700 text-sm">Upside</strong>
-              <p className="text-sm mt-1">{scenario.upside}</p>
+              <p className="text-sm mt-1">The feature drives engagement and revenue. Shipping it builds user trust in the platform's responsiveness.</p>
             </div>
             <div className="p-3 rounded-lg" style={{ background: '#FBE9EA' }}>
               <strong className="text-red-700 text-sm">Concern</strong>
-              <p className="text-sm mt-1">{scenario.concern}</p>
+              <p className="text-sm mt-1">{scenario.issue}</p>
             </div>
           </div>
-          <p className="text-sm italic text-ink-soft mb-3">{scenario.stakeholderPressure}</p>
+          <div className="mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-1">Policy categories to consider</p>
+            <ul className="list-disc pl-5 text-sm space-y-1">{scenario.policyCategories?.map((c: string, i: number) => <li key={i}>{c}</li>)}</ul>
+          </div>
           <p className="text-sm font-medium mb-2">What do you decide, and how do you mitigate the concern without killing the upside?</p>
-          <textarea className="sense-textarea" value={answer} onChange={e => setAnswer(e.target.value)} />
-          <button className="btn btn-primary mt-4" onClick={handleSubmit} disabled={!answer.trim()}>Submit</button>
+          <textarea className="sense-textarea" value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Example: I would ship the feature but with a mandatory review gate for high-severity cases, a 48-hour escalation path, and a kill-switch if the false-positive rate exceeds 5%..." />
+          <button className="btn btn-primary mt-4" onClick={handleSubmit} disabled={!answer.trim()}>Submit Decision</button>
         </div>
       )}
       {result && phase === 'grade' && (
