@@ -212,6 +212,14 @@ export const trustSafetyPool: TrustSafetyScenario[] = [
   { issue: "News outlet published article using docs allegedly from your admin panel. Must determine: hack or insider?", severity: "critical", contentCategory: "data_breach", policyCategories: ["Breach notification", "Insider threat investigation", "Law enforcement engagement"], difficulty: d(6, 6) },
 ];
 
+export {
+  generatedMetricsPool, generatedGuesstimatePool, generatedPrioritizePool,
+  generatedProductSensePool, generatedABTestPool, generatedCrisisPool,
+  generatedNorthStarPool, generatedStandoffPool, generatedScopePool,
+  generatedInterviewPool, generatedQueryQuestPool, generatedPostmortemPool,
+  generatedTrustSafetyPool
+} from './generated';
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
