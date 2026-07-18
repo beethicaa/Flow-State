@@ -60,7 +60,8 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
     const newTrust = Math.min(100, Math.max(0, trust + opt.trustDelta));
     setTrust(newTrust);
     setTranscript(t => [...t, opt.line]);
-    if (turnIdx >= 2) {
+    const isLast = turnIdx >= scenario.turns.length - 1;
+    if (isLast) {
       setSubmitted(true);
       gradeSubmission(newTrust, [...transcript, opt.line]);
     } else {
