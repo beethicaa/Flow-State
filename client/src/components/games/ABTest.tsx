@@ -107,7 +107,7 @@ Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJud
           </div>
           <button onClick={handleSubmit} disabled={!action || !justification || loading} className="btn btn-primary">{loading ? 'Grading…' : 'Submit'}</button>
         </>
-      ) : grade && (
+      ) : grade ? (
         <div>
           <Stamp tier={grade.judgmentScore >= 80 ? 'high' : grade.judgmentScore >= 55 ? 'mid' : 'low'}
             label={grade.judgmentScore >= 80 ? 'Sharp read' : grade.judgmentScore >= 55 ? 'Defensible' : 'Missed the real signal'}
@@ -119,7 +119,9 @@ Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJud
           <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}><p className="text-sm">{grade.debrief}</p></div>
           <button onClick={loadScenario} className="btn mt-5" disabled={loading}>{loading ? '…' : 'Next Test →'}</button>
         </div>
-      )}
+      ) : submitted ? (
+        <div className="panel"><p className="text-sm">Grading…</p></div>
+      ) : null}
     </GameLayout>
   );
 }
