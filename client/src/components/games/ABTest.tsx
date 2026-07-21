@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGenerate } from '../../hooks/useGenerate';
-import GameLayout, { LoadingState, ErrorState, Stamp, RubricRow, JudgmentScore } from '../GameLayout';
+import GameLayout, { LoadingState, Stamp, RubricRow, JudgmentScore } from '../GameLayout';
 
 interface ABPoolScenario {
   variantA: { label: string; users: number; conversions: number; rate: string };
@@ -65,6 +65,7 @@ export default function ABTestGame({ onComplete }: Props) {
   const [justification, setJustification] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [grade, setGrade] = useState<Grade | null>(null);
+  const [loadAttempted, setLoadAttempted] = useState(false);
   const genRef = useRef(false);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function ABTestGame({ onComplete }: Props) {
     setGrade(null);
     setAction(null);
     setJustification('');
+    setLoadAttempted(false);
 
     const raw = await generate({
       system: 'You design A/B test scenarios with statistical traps for PMs.',
@@ -93,6 +95,7 @@ export default function ABTestGame({ onComplete }: Props) {
 }`
     });
 
+    setLoadAttempted(true);
     if (raw && typeof raw === 'object' && 'variantA' in raw) {
       setScenario(mapPoolToScenario(raw as ABPoolScenario));
     }
@@ -141,40 +144,48 @@ export default function ABTestGame({ onComplete }: Props) {
     onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
   }
 
-  if (loading && !scenario) {
-    return (
-      <GameLayout title="A/B Test Autopsy" subtitle="Analytics" icon="↔" iconBg="bg-gradient-to-br from-teal-700 to-teal/60">
-        <LoadingState message="Generating experiment…" />
-      </GameLayout>
-    );
-  }
-  if (error && !scenario) return <ErrorState message={error} onRetry={loadScenario} />;
-  if (!scenario) return null;
-
+  // Always render GameLayout shell — never return null so the page never blanks
   return (
     <GameLayout title="A/B Test Autopsy" subtitle="Analytics" icon="↔" iconBg="bg-gradient-to-br from-teal-700 to-teal/60">
-      <div className="panel mb-4">
-        <div className="grid grid-cols-2 gap-4 mb-3">
-          {scenario.variants.map(v => (
-            <div key={v.name}>
-              <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>{v.name}</div>
-              <div className="font-display font-bold text-lg">{(v.rate * 100).toFixed(2)}%</div>
-              <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>n={v.sample.toLocaleString()}</div>
-            </div>
-          ))}
+      {(loading || !scenario) && !submitted && (
+        <LoadingState message={error ? "Failed to load experiment" : "Generating experiment…"} />
+      )}
+      {error && !scenario && (
+        <div className="panel mb-4" style={{ borderLeft: '4px solid var(--red)' }}>
+          <p className="text-sm">{error}</p>
+          <button onClick={loadScenario} className="btn btn-primary mt-3">Retry</button>
         </div>
-        <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>p = {scenario.pValue.toFixed(4)}</div>
-        {scenario.guardrails.map((g, i) => (
-          <div key={i} className="text-xs mt-1" style={{ color: g.change.startsWith('+') ? 'var(--red)' : 'var(--green)' }}>
-            {g.metric}: {g.change}
-          </div>
-        ))}
-        {scenario.overlappingCI && <div className="text-xs mt-1" style={{ color: 'var(--amber)' }}>Confidence intervals overlap</div>}
-        <div className="text-xs mt-1 font-mono" style={{ color: 'var(--ink-soft)' }}>{scenario.segmentDetail}</div>
-      </div>
+      )}
+      {error && loadAttempted && !scenario && (
+        <div className="panel mb-4" style={{ background: 'var(--paper-alt)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--red)' }}>Could not load A/B test scenario.</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--ink-soft)' }}>Try again or check your connection.</p>
+          <button onClick={loadScenario} className="btn btn-primary mt-3">Retry</button>
+        </div>
+      )}
 
-      {!submitted ? (
+      {scenario && !submitted && (
         <>
+          <div className="panel mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              {scenario.variants.map(v => (
+                <div key={v.name}>
+                  <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>{v.name}</div>
+                  <div className="font-display font-bold text-lg">{(v.rate * 100).toFixed(2)}%</div>
+                  <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>n={v.sample.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs font-mono" style={{ color: 'var(--ink-soft)' }}>p = {scenario.pValue.toFixed(4)}</div>
+            {scenario.guardrails.map((g, i) => (
+              <div key={i} className="text-xs mt-1" style={{ color: g.change.startsWith('+') ? 'var(--red)' : 'var(--green)' }}>
+                {g.metric}: {g.change}
+              </div>
+            ))}
+            {scenario.overlappingCI && <div className="text-xs mt-1" style={{ color: 'var(--amber)' }}>Confidence intervals overlap</div>}
+            <div className="text-xs mt-1 font-mono" style={{ color: 'var(--ink-soft)' }}>{scenario.segmentDetail}</div>
+          </div>
+
           <div className="text-xs font-mono uppercase mb-2" style={{ color: 'var(--ink-soft)' }}>What do you do?</div>
           <div className="flex flex-wrap gap-2 mb-4">
             {ACTIONS.map(a => (
@@ -187,7 +198,9 @@ export default function ABTestGame({ onComplete }: Props) {
           </div>
           <button onClick={handleSubmit} disabled={!action || !justification || loading} className="btn btn-primary">{loading ? 'Grading…' : 'Submit'}</button>
         </>
-      ) : grade && (
+      )}
+
+      {grade && (
         <div>
           <Stamp tier={grade.judgmentScore >= 80 ? 'high' : grade.judgmentScore >= 55 ? 'mid' : 'low'}
             label={grade.judgmentScore >= 80 ? 'Sharp read' : grade.judgmentScore >= 55 ? 'Defensible' : 'Missed the real signal'}
