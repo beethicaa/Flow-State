@@ -48,6 +48,13 @@ export function useGenerate() {
     await new Promise(r => setTimeout(r, 80));
     setLoading(false);
 
+    // GRADE/EVAL calls: return null so the game's own fallback grading is used.
+    // This avoids content-based keyword routing accidentally matching scenario
+    // pools and returning wrong-shaped data (e.g. a Scenario object instead of a Grade).
+    if (_opts.pool === 'grade') {
+      return null;
+    }
+
     try {
       const tier = getTier();
       const poolKey = _opts.pool || '';

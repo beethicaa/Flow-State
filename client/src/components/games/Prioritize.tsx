@@ -64,9 +64,14 @@ export default function PrioritizeGame({ onComplete }: Props) {
   }
 
   async function handleSubmit() {
-    if (!scenario || rationale.split(' ').length < 6) return;
+    if (!scenario) return;
+    if (!rationale || rationale.split(' ').filter(Boolean).length < 6) {
+      alert('Please write at least 6 words explaining your rationale.');
+      return;
+    }
     setSubmitted(true);
     const data = await generate({
+      pool: 'grade',
       system: 'You evaluate how PMs prioritize under constraints.',
       prompt: `Stakes: "${scenario.stakes}". Constraint: "${scenario.constraint}".
 Strong ranking looks like: "${scenario.strongRankingLooksLike}".
@@ -120,6 +125,7 @@ Output JSON: {"tradeoffAwareness":0-33,"politicalRealism":0-33,"clarity":0-33,"j
             <textarea value={rationale} onChange={e => setRationale(e.target.value)} className="panel w-full min-h-[80px] resize-y text-sm" placeholder="Why this order? What trade-offs did you consider…" />
           </div>
           <button onClick={handleSubmit} disabled={!rationale || loading} className="btn btn-primary">{loading ? 'Grading…' : 'Submit Ranking'}</button>
+          {rationale && rationale.split(' ').filter(Boolean).length < 6 && <p className="text-xs mt-1" style={{color:'var(--red)'}}>Write at least 6 words</p>}
         </>
       ) : grade && (
         <div>

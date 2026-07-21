@@ -72,6 +72,7 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
   async function gradeSubmission(finalTrust: number, fullTranscript: string[]) {
     if (!scenario) return;
     const data = await generate({
+      pool: 'grade',
       system: 'You evaluate PM stakeholder communication. Critique whether they addressed the real concern or just placated.',
       prompt: `Underlying concern: "${scenario.underlyingConcern}". Full transcript: ${fullTranscript.map((l, i) => `Turn ${i}: ${l}`).join(' | ')}. Final trust: ${finalTrust}/100.
 Output JSON: {"deEscalation":0-33,"transparency":0-33,"outcome":0-33,"judgmentScore":<sum>,"debrief":"2-3 sentences on if they addressed the real concern or just placated"}`

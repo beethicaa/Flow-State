@@ -47,6 +47,7 @@ Generate a skeptical counter-argument specifically against this metric. Output J
     if (!scenario) return;
     setPhase('done');
     const data = await generate({
+      pool: 'grade',
       system: 'You grade a PM\'s metric selection, reasoning, and ability to defend under pushback.',
       prompt: `Business: "${scenario.businessModel}". Strong answer looks like: "${scenario.strongAnswerLooksLike}".
 Best metric: "${scenario.best}". Risks: ${scenario.gamblingRisks.join('; ')}.

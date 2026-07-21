@@ -57,10 +57,11 @@ interface StampProps {
 
 export function Stamp({ tier, label, xp }: StampProps) {
   const cls = tier === 'high' ? 'stamp-high' : tier === 'mid' ? 'stamp-mid' : 'stamp-low';
+  const safeXp = isNaN(xp) || xp === null || xp === undefined ? 0 : xp;
   return (
     <div className="flex items-center gap-4 mb-6">
       <span className={`stamp ${cls}`}>{label}</span>
-      <span className="font-hand text-lg text-ink-soft">+{xp} XP</span>
+      <span className="font-hand text-lg text-ink-soft">+{safeXp} XP</span>
     </div>
   );
 }
@@ -88,10 +89,11 @@ export function RubricRow({ label, score, max }: RubricRowProps) {
 
 export function JudgmentScore({ score, max }: { score: number; max?: number }) {
   const m = max || 100;
+  const safeScore = isNaN(score) || score === null || score === undefined ? 0 : score;
   return (
     <div className="flex items-baseline gap-2 mb-4">
-      <span className="judgment-score" style={{ color: score >= 80 ? 'var(--green)' : score >= 55 ? 'var(--amber)' : 'var(--red)' }}>
-        {score}
+      <span className="judgment-score" style={{ color: safeScore >= 80 ? 'var(--green)' : safeScore >= 55 ? 'var(--amber)' : 'var(--red)' }}>
+        {safeScore}
       </span>
       <span className="text-ink-soft font-body">/ {m}</span>
     </div>

@@ -39,6 +39,7 @@ Keep transcript 150-250 words.${isBoss ? ' Make this deliberately harder: less c
     if (!answer.trim() || !data || submitting) return;
     setSubmitting(true);
     const result = await generate({
+      pool: 'grade',
       system: "You are an exacting PM interviewer grading qualitative reasoning.",
       prompt: `Grade this answer to an interview-debrief exercise. Output JSON: {"signalVsNoise":0-33,"biasAwareness":0-33,"validationRigor":0-33,"judgmentScore":0-100,"debrief":"2-3 sentences explaining what they missed and what a strong answer looks like"}
 

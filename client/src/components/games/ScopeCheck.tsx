@@ -37,6 +37,7 @@ Vary whether the estimate is justified or padded.${isBoss ? ' Make this delibera
     if (!answer.trim() || !data || submitting) return;
     setSubmitting(true);
     const result = await generate({
+      pool: 'grade',
       system: "You are an exacting PM interviewer grading scope negotiation responses.",
       prompt: `Grade this answer to a scope-check exercise. Output JSON: {"technicalCuriosity":0-33,"collaborativeTone":0-33,"scopeJudgment":0-33,"judgmentScore":0-100,"debrief":"2-3 sentences explaining what they missed and what a strong answer looks like"}
 

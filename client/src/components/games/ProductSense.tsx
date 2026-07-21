@@ -50,6 +50,7 @@ export default function ProductSenseGame({ onComplete }: Props) {
     if (!scenario) return;
     setPhase('done');
     const data = await generate({
+      pool: 'grade',
       system: 'You grade PM answers across 5 dimensions. Be specific and demanding.',
       prompt: `Prompt: "${scenario.prompt}". Rubric: "${scenario.rubric}".
 First answer: """${firstAnswer}"""

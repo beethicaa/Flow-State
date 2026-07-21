@@ -53,6 +53,7 @@ export default function QueryQuest({ onComplete }: { onComplete: (xp: number, sk
     if (!selectedBug || !explanation.trim() || !scenario) return;
     const bugScore = selectedBug === scenario.bugType ? 50 : 0;
     const gradeResult = await generate({
+      pool: 'grade',
       system: 'Grade a player explanation against a known answer. Return JSON.',
       prompt: `Known bug explanation: ${scenario.bugExplanation}\nPlayer explanation: ${explanation}\nRate 0-50 on accuracy and specificity. JSON: { "score": number, "feedback": "1 sentence" }`
     });

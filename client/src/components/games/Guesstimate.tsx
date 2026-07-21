@@ -64,6 +64,7 @@ export default function GuesstimateGame({ onComplete }: Props) {
     const numericScore = ratio < 0.1 ? 40 : ratio < 0.5 ? 25 : ratio < 1 ? 15 : 5;
 
     const gradeData = await generate({
+      pool: 'grade',
       system: 'You grade the reasoning behind a Fermi estimate, not just the number. A lucky close guess with a shallow method should score lower than a well-reasoned estimate in the right order of magnitude.',
       prompt: `Question: "${scenario.question}". Reference method: "${scenario.referenceMethod}".
 Player's method: """${method}"""
@@ -122,12 +123,12 @@ Output JSON:
             {loading ? 'Grading…' : 'Submit'}
           </button>
         </>
-      ) : grade && (
+      ) : grade ? (
         <div>
           <Stamp
-            tier={grade.judgmentScore >= 70 ? 'high' : grade.judgmentScore >= 40 ? 'mid' : 'low'}
-            label={grade.judgmentScore >= 70 ? 'Sharp read' : grade.judgmentScore >= 40 ? 'Defensible' : 'Missed the real signal'}
-            xp={Math.round(grade.judgmentScore * 0.4)}
+            tier={(grade.judgmentScore || 0) >= 70 ? 'high' : (grade.judgmentScore || 0) >= 40 ? 'mid' : 'low'}
+            label={(grade.judgmentScore || 0) >= 70 ? 'Sharp read' : (grade.judgmentScore || 0) >= 40 ? 'Defensible' : 'Missed the real signal'}
+            xp={Math.round((grade.judgmentScore || 50) * 0.4)}
           />
           <JudgmentScore score={grade.judgmentScore} />
           <RubricRow label="Numeric proximity" score={grade.numericScore} max={40} />
@@ -147,7 +148,9 @@ Output JSON:
             {loading ? 'Generating…' : 'Next Question →'}
           </button>
         </div>
-      )}
+      ) : submitted ? (
+        <div className="panel"><p className="text-sm">Grading…</p></div>
+      ) : null}
     </GameLayout>
   );
 }

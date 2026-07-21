@@ -52,6 +52,7 @@ export default function ABTestGame({ onComplete }: Props) {
     if (!scenario || !action) return;
     setSubmitted(true);
     const data = await generate({
+      pool: 'grade',
       system: 'You evaluate PMs on A/B test interpretation — statistical reasoning, guardrail awareness, and business judgment.',
       prompt: `Test data: p=${scenario.pValue}, CIs overlap: ${scenario.overlappingCI}, segment detail: ${scenario.segmentDetail}.
 Guardrails: ${scenario.guardrails.map(g => `${g.metric} ${g.change}`).join(', ')}.
