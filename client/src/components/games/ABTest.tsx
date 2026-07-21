@@ -32,6 +32,8 @@ export default function ABTestGame({ onComplete }: Props) {
     setScenario(null);
     setSubmitted(false);
     setGrade(null);
+    setAction(null);
+    setJustification('');
     const data = await generate({
       system: 'You design A/B test scenarios with statistical traps for PMs.',
       prompt: `Generate an A/B test scenario with traps. Include overlapping CIs, a segment-level heterogeneity detail, and guardrail metrics. Output JSON:
@@ -48,6 +50,44 @@ export default function ABTestGame({ onComplete }: Props) {
     if (data) setScenario(data);
   }
 
+  function computeGrade(): Grade {
+    if (!scenario || !action) {
+      return { statisticalReasoning: 10, guardrailAwareness: 10, businessJudgment: 10, judgmentScore: 30, debrief: 'Please select an action and provide justification.' };
+    }
+
+    // Check if action matches the correct action
+    const expected = scenario.correctAction;
+    const actionMatch = action === expected;
+    const justificationWords = justification.split(/\s+/).filter(Boolean).length;
+
+    // Statistical reasoning: did they address p-value, overlapping CIs?
+    const hasPvalue = /p.?value|significant|p\s*=|\d\.\d{2,}/i.test(justification);
+    const hasCi = /ci|confidence|overlap?|interval/i.test(justification);
+    const hasSegment = /segment|user|cohort|group|new.*return|heterogene/i.test(justification);
+    const hasGuardrail = /guardrail|latency|refund|error|perf|regression|side.i?effect/i.test(justification);
+
+    const statisticalReasoning = hasPvalue && hasCi ? 32 : hasPvalue || hasCi ? 22 : 12;
+    const guardrailAwareness = hasGuardrail ? 25 : justificationWords >= 8 ? 15 : 10;
+    const businessJudgment = actionMatch ? 25 : 10;
+
+    // Boost if they matched correct action but didn't articulate well
+    const withActionBonus = actionMatch ? 2 : 0;
+    const adjustedStatistical = Math.min(40, statisticalReasoning + withActionBonus);
+    const judgmentScore = adjustedStatistical + guardrailAwareness + businessJudgment;
+
+    // Guardrail concerns text
+    const guardrailConcerns = scenario.guardrails
+      .filter(g => g.change.startsWith('+'))
+      .map(g => `${g.metric} (${g.change})`)
+      .join(', ');
+
+    const debrief = actionMatch
+      ? `Correct decision. ${hasGuardrail ? 'Good guardrail awareness.' : guardrailConcerns ? `Note the guardrail concerns: ${guardrailConcerns}.` : ''} ${hasSegment ? 'You properly considered segment-level effects.' : 'A sharp read would also weigh the segment-level heterogeneity.'} ${scenario.explanation}`
+      : `You chose "${action}". The recommended action is "${expected}". ${scenario.explanation} ${guardrailConcerns ? `Key guardrails to watch: ${guardrailConcerns}.` : ''} ${hasSegment ? 'Good segment awareness.' : 'Consider segment-level effects next time.'}`;
+
+    return { statisticalReasoning: adjustedStatistical, guardrailAwareness, businessJudgment, judgmentScore, debrief };
+  }
+
   const handleSubmit = async () => {
     if (!scenario || !action) return;
     setSubmitted(true);
@@ -59,12 +99,13 @@ Guardrails: ${scenario.guardrails.map(g => `${g.metric} ${g.change}`).join(', ')
 Player's action: "${action}". Player's justification: """${justification}"""
 Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJudgment":0-30,"judgmentScore":<sum>,"debrief":"3-4 sentences explaining what a sharp read would have weighed"}`
     });
-    if (data) {
+    if (data && typeof data.judgmentScore === 'number') {
       setGrade(data);
       onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'analytics');
     } else {
-      setGrade({ statisticalReasoning: 20, guardrailAwareness: 15, businessJudgment: 15, judgmentScore: 50, debrief: 'Your analysis was submitted. Consider whether the effect is practically significant even if statistically significant.' });
-      onComplete(20, 'analytics');
+      const g = computeGrade();
+      setGrade(g);
+      onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
     }
   };
 
@@ -120,9 +161,9 @@ Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJud
           <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}><p className="text-sm">{grade.debrief}</p></div>
           <button onClick={loadScenario} className="btn mt-5" disabled={loading}>{loading ? '…' : 'Next Test →'}</button>
         </div>
-      ) : submitted ? (
+      ) : (
         <div className="panel"><p className="text-sm">Grading…</p></div>
-      ) : null}
+      )}
     </GameLayout>
   );
 }

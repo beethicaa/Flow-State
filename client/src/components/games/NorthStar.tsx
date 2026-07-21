@@ -43,9 +43,33 @@ Generate a skeptical counter-argument specifically against this metric. Output J
     else setSkepticLine('How would you ensure this metric doesn\'t get gamed?');
   }
 
+  function computeGrade(): Grade {
+    if (!scenario || !pick) {
+      return { metricSelection: 10, reasoningQuality: 10, rebuttalHandling: 10, judgmentScore: 30, debrief: 'Please complete all sections before submitting.' };
+    }
+    // Metric selection: full marks if they picked the best metric
+    const metricSelection = pick === scenario.best ? 30 : 10;
+    // Reasoning quality: based on length and depth
+    const reasoningWords = reasoning.split(/\s+/).filter(Boolean).length;
+    const reasoningQuality = reasoningWords >= 20 ? 28 : reasoningWords >= 10 ? 20 : 12;
+    // Rebuttal handling: based on length of response
+    const rebuttalWords = rebuttal.split(/\s+/).filter(Boolean).length;
+    const rebuttalHandling = rebuttalWords >= 15 ? 28 : rebuttalWords >= 8 ? 18 : 10;
+    const judgmentScore = metricSelection + reasoningQuality + rebuttalHandling;
+
+    const correct = pick === scenario.best;
+    const bestName = scenario.best;
+    let debrief = correct
+      ? `Strong pick — "${bestName}" is indeed the best North Star. ${reasoningQuality >= 20 ? 'Your reasoning shows good understanding of the trade-offs.' : 'Work on explaining why this metric drives the business model directly.'} ${rebuttalHandling >= 18 ? 'You handled the pushback well.' : 'When pushed back, address the gaming risk head-on with specific mitigation strategies.'}`
+      : `You picked "${pick}", but the strongest North Star here is "${bestName}". ${scenario.strongAnswerLooksLike}. ${rebuttalHandling >= 18 ? 'Your rebuttal was solid even with the wrong pick.' : 'Try defending your choice by anticipating gaming risks directly.'}`;
+
+    return { metricSelection, reasoningQuality, rebuttalHandling, judgmentScore, debrief };
+  }
+
   async function handleRebuttalSubmit() {
     if (!scenario) return;
     setPhase('done');
+    // Use generate for a richer evaluation, but fall back to local compute if it returns null
     const data = await generate({
       pool: 'grade',
       system: 'You grade a PM\'s metric selection, reasoning, and ability to defend under pushback.',
@@ -55,12 +79,13 @@ Player's pick: "${pick}". Reasoning: """${reasoning}"""
 Skeptic: "${skepticLine}". Rebuttal: """${rebuttal}"""
 Output JSON: {"metricSelection":0-30,"reasoningQuality":0-35,"rebuttalHandling":0-35,"judgmentScore":<sum>,"debrief":"2-3 sentences on whether they anticipated gaming risks and handled pushback"}`
     });
-    if (data) {
+    if (data && typeof data.metricSelection === 'number') {
       setGrade(data);
       onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'strategy');
     } else {
-      setGrade({ metricSelection: 15, reasoningQuality: 15, rebuttalHandling: 15, judgmentScore: 45, debrief: 'Your metric choice was noted. A strong answer anticipates how the metric could be gamed.' });
-      onComplete(18, 'strategy');
+      const g = computeGrade();
+      setGrade(g);
+      onComplete(Math.round((g.judgmentScore || 50) * 0.4), 'strategy');
     }
   }
 

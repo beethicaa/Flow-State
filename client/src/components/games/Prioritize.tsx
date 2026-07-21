@@ -63,6 +63,41 @@ export default function PrioritizeGame({ onComplete }: Props) {
     setOrder(next);
   }
 
+  function computeGrade(): Grade {
+    if (!scenario) {
+      return { tradeoffAwareness: 10, politicalRealism: 10, clarity: 10, judgmentScore: 30, debrief: 'No scenario loaded.' };
+    }
+
+    const rationaleWords = rationale.split(/\s+/).filter(Boolean).length;
+    const hasHiddenCost = /hidden|cost|risk|trade.?off|downside|unintended|consequence/i.test(rationale);
+    const hasConstraint = /constraint|limit|capacity|resource|eng(ineering)?|time|budget|legal|complian/i.test(rationale);
+    const hasStakeholder = /stakeholder|ceo|sales|legal|investor|customer|user|team|engineer|exec|board/i.test(rationale);
+    const hasRevenue = /revenue|revenue.?impact|cost|penalty|churn|retention|arr|mrr|dollar|money|financial/i.test(rationale);
+
+    const tradeoffAwareness = hasHiddenCost && hasConstraint ? 28 : hasHiddenCost || hasConstraint ? 18 : 10;
+    const politicalRealism = hasStakeholder && hasRevenue ? 28 : hasStakeholder || hasRevenue ? 18 : 10;
+    const clarity = rationaleWords >= 20 ? 28 : rationaleWords >= 10 ? 20 : 12;
+
+    const judgmentScore = tradeoffAwareness + politicalRealism + clarity;
+
+    const missing: string[] = [];
+    if (!hasHiddenCost) missing.push('hidden costs/risks of items');
+    if (!hasConstraint) missing.push('the constraint (capacity, timeline)');
+    if (!hasStakeholder) missing.push('stakeholder dynamics');
+    if (!hasRevenue) missing.push('revenue/business impact');
+
+    let debrief = '';
+    if (missing.length === 0) {
+      debrief = `Strong prioritization. You weighed hidden costs, constraints, stakeholders, and business impact. ${scenario.strongRankingLooksLike}`;
+    } else if (missing.length <= 2) {
+      debrief = `Good start. To strengthen, consider: ${missing.join(' and ')}. ${scenario.strongRankingLooksLike}`;
+    } else {
+      debrief = `Your ranking was noted but needs more depth. Key gaps: ${missing.join(', ')}. ${scenario.strongRankingLooksLike}`;
+    }
+
+    return { tradeoffAwareness, politicalRealism, clarity, judgmentScore, debrief };
+  }
+
   async function handleSubmit() {
     if (!scenario) return;
     if (!rationale || rationale.split(' ').filter(Boolean).length < 6) {
@@ -80,12 +115,13 @@ Player's order: ${order.map((id, i) => `${i + 1}. ${scenario.items.find(x => x.i
 Player's rationale: """${rationale}"""
 Output JSON: {"tradeoffAwareness":0-33,"politicalRealism":0-33,"clarity":0-33,"judgmentScore":<sum>,"debrief":"2-3 sentences noting which hidden costs they seem to have missed"}`
     });
-    if (data) {
+    if (data && typeof data.judgmentScore === 'number') {
       setGrade(data);
       onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'execution');
     } else {
-      setGrade({ tradeoffAwareness: 15, politicalRealism: 15, clarity: 15, judgmentScore: 45, debrief: 'Your submission was received. A stronger ranking would weigh hidden costs more explicitly.' });
-      onComplete(18, 'execution');
+      const g = computeGrade();
+      setGrade(g);
+      onComplete(Math.round(g.judgmentScore * 0.4), 'execution');
     }
   }
 

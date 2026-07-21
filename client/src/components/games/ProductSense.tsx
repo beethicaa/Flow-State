@@ -46,6 +46,47 @@ export default function ProductSenseGame({ onComplete }: Props) {
     else setSkepticPushback('How would you measure whether this actually worked?');
   }
 
+  function computeGrade(): Grade {
+    if (!scenario) {
+      return { problemFraming: 2, userEmpathy: 2, tradeoffs: 2, metrics: 2, handledPushback: 2, judgmentScore: 32, debrief: 'Could not grade your answer.' };
+    }
+
+    const firstWords = firstAnswer.split(/\s+/).filter(Boolean).length;
+    const secondWords = secondAnswer.split(/\s+/).filter(Boolean).length;
+
+    // Score each dimension based on considerations
+    const hasUserNeed = /user|need|pain|frustrat|problem/i.test(firstAnswer);
+    const hasMetrics = /metric|measure|success|kpi|xp|rpm|ltv|retention|conversion|engagement/i.test(firstAnswer);
+    const hasTradeoffs = /trade.?off|cost|risk|downside|limit|compete|priority|scope|effort|complexity|spend|decision|weigh|balance/i.test(firstAnswer);
+    const hasConstraints = /eng(ineering)?|capacity|time|team|budget|resourc/i.test(firstAnswer);
+
+    const problemFraming = firstWords >= 15 && hasUserNeed ? 4 : firstWords >= 8 ? 2 : 1;
+    const userEmpathy = hasUserNeed ? 4 : 1;
+    const tradeoffs = hasTradeoffs && hasConstraints ? 4 : hasTradeoffs ? 2 : 1;
+    const metrics = hasMetrics ? 4 : 1;
+    const handledPushback = secondWords >= 10 ? secondWords >= 20 ? 4 : 3 : 1;
+
+    const rawScore = problemFraming + userEmpathy + tradeoffs + metrics + handledPushback;
+    const judgmentScore = Math.round((rawScore / 25) * 100);
+
+    let debrief = '';
+    const missing: string[] = [];
+    if (!hasUserNeed) missing.push('explicit user need/empathy');
+    if (!hasTradeoffs) missing.push('trade-off analysis');
+    if (!hasMetrics) missing.push('metrics/success measurement');
+    if (secondWords < 10) missing.push('a substantive pushback response');
+
+    if (missing.length === 0) {
+      debrief = 'Strong answer across all dimensions. You covered user needs, trade-offs, metrics, and addressed the pushback effectively.';
+    } else if (missing.length <= 2) {
+      debrief = `Good foundation. To strengthen: include ${missing.join(' and ')} in your answer. A top response would also reference the specific constraint (engineering capacity, competitive threat, timeline). ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
+    } else {
+      debrief = `Your answer was noted but needs more depth. Key missing elements: ${missing.join(', ')}. The rubric mentions: ${scenario.rubric}. ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
+    }
+
+    return { problemFraming: Math.min(5, problemFraming), userEmpathy: Math.min(5, userEmpathy), tradeoffs: Math.min(5, tradeoffs), metrics: Math.min(5, metrics), handledPushback: Math.min(5, handledPushback), judgmentScore, debrief };
+  }
+
   async function handleSecondSubmit() {
     if (!scenario) return;
     setPhase('done');
@@ -58,14 +99,17 @@ Follow-up: "${skepticPushback}"
 Follow-up response: """${secondAnswer}"""
 Output JSON: {"problemFraming":0-5,"userEmpathy":0-5,"tradeoffs":0-5,"metrics":0-5,"handledPushback":0-5,"judgmentScore":<sum/25*100>,"debrief":"2-3 sentences, note if they addressed the pushback or deflected"}`
     });
-    if (data) {
+    if (data && typeof data.judgmentScore === 'number') {
       setGrade(data);
       const strategyXp = Math.round((data.judgmentScore || 50) * 0.4 * 0.6);
       const commXp = Math.round((data.judgmentScore || 50) * 0.4 * 0.4);
       onComplete(strategyXp + commXp, 'strategy');
     } else {
-      setGrade({ problemFraming: 3, userEmpathy: 3, tradeoffs: 2, metrics: 2, handledPushback: 2, judgmentScore: 48, debrief: 'Your answer was submitted. A stronger answer would address trade-offs more explicitly and show metrics thinking.' });
-      onComplete(20, 'strategy');
+      const g = computeGrade();
+      setGrade(g);
+      const strategyXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.6);
+      const commXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.4);
+      onComplete(strategyXp + commXp, 'strategy');
     }
   }
 
