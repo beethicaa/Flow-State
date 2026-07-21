@@ -75,7 +75,7 @@ export function useGenerate() {
       if (poolKey === 'productSense' || sys.includes('product sense') || sys.includes('design a feature') || (sys.includes('prompt') && prompt.includes('context'))) {
         return pickForPool('productSense', tier);
       }
-      if (poolKey === 'abTest' || sys.includes('experiment') || sys.includes('ab test') || sys.includes('autopsy')) {
+      if (poolKey === 'abTest' || sys.includes('experiment') || sys.includes('ab test') || sys.includes('a/b') || sys.includes('autopsy')) {
         return pickForPool('abTest', tier);
       }
       if (poolKey === 'crisis' || sys.includes('incident') || sys.includes('blast radius') || sys.includes('crisis')) {
