@@ -25,7 +25,6 @@ interface MappedScenario {
 }
 
 interface Variant { name: string; rate: number; sample: number; }
-interface Guardrail { metric: string; change: string; }
 interface Grade { statisticalReasoning: number; guardrailAwareness: number; businessJudgment: number; judgmentScore: number; debrief: string; }
 interface Props { onComplete: (xp: number, skill: string) => void; }
 
@@ -86,7 +85,7 @@ export default function ABTestGame({ onComplete }: Props) {
 {
   "variants": [{"name":"Control","rate":0.042,"sample":49000},{"name":"Variant B","rate":0.045,"sample":49000}],
   "pValue": 0.03,
-  "guardrails": [{"metric":"Latency (p95)","change":"+8%"},{"metric":"Refund rate","change":"+0.2%"}],
+  "guardrails": [{"metric":"Latency (P95)","change":"+8%"},{"metric":"Refund rate","change":"+0.2%"},{"metric":"Error rate","change":"+0.6%"}],
   "overlappingCI": true,
   "segmentDetail": "Effect is +9% for new users but -2% for returning users",
   "correctAction": "Run it longer|Ship it|Kill it|Ship with guardrail fix",
