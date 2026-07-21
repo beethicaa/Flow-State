@@ -45,21 +45,29 @@ export default function Postmortem({ onComplete }: { onComplete: (xp: number, sk
     const lower = answer.toLowerCase();
     const matchedItems = scenario.actionItems.filter((item: string) => lower.includes(item.toLowerCase().slice(0, 30)));
     const matchRate = matchedItems.length / Math.max(scenario.actionItems.length, 1);
-    const hasBlameless = lower.includes('blame') || lower.includes('root cause') || lower.includes('process');
+    const hasBlameless = /blameless|root cause|process|system|prevent|recurrence|gap|miss/i.test(lower);
+    const hasWhatWentWrong = scenario.whatWentWrong?.some((w: string) => lower.includes(w.toLowerCase().slice(0, 20))) || false;
     const blamelessness = Math.round(33 * (hasBlameless ? 0.85 : 0.35));
-    const rootCauseRigor = Math.round(33 * Math.min(1, matchRate + 0.5));
+    const rootCauseRigor = Math.round(33 * Math.min(1, matchRate + 0.5 + (hasWhatWentWrong ? 0.2 : 0)));
     const actionability = Math.round(33 * Math.min(1, matchRate + 0.2));
     const scores = { blamelessness, rootCauseRigor, actionability };
     const judgmentScore = Math.round((blamelessness + rootCauseRigor + actionability) / 3);
     const xp = Math.max(10, Math.round(judgmentScore / 100 * 30));
-    const topItems = scenario.actionItems.slice(0, 2).join('; ');
-    setResult({
-      scores,
-      debrief: scenario.actionItems.length > 0
-        ? `Strong postmortem. A rigorous one identifies systemic issues — not just what happened, but why the process allowed it. Key action items: ${topItems}.`
-        : `Consider what process changes would prevent recurrence. Blameless postmortems focus on systems, not people.`,
-      judgmentScore, xp
-    });
+
+    // Contextual debrief using specific scenario data
+    const whatWentWrongItems = scenario.whatWentWrong?.join('; ') || '';
+    const actionItemsList = scenario.actionItems?.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n') || '';
+
+    let debrief = '';
+    if (hasBlameless && matchRate >= 0.5) {
+      debrief = `Strong postmortem. You identified the systemic issues and proposed concrete fixes. The key failure points to address: ${whatWentWrongItems}. Recommended actions:\n${actionItemsList}`;
+    } else if (hasBlameless) {
+      debrief = `Good blameless framing. For deeper root cause analysis, explicitly connect each failure to an action item. What went wrong: ${whatWentWrongItems}. Key action items: ${actionItemsList}`;
+    } else {
+      debrief = `Your postmortem identified some issues. Aim for a blameless tone that focuses on systems, not people. What went wrong: ${whatWentWrongItems}. Strong action items to consider:\n${actionItemsList}`;
+    }
+
+    setResult({ scores, debrief, judgmentScore, xp });
     setPhase('grade');
     onComplete(xp, 'communication');
   }
@@ -99,7 +107,7 @@ export default function Postmortem({ onComplete }: { onComplete: (xp: number, sk
               </div>
             ))}
           </div>
-          <div className="explain-box mt-4">{result.debrief}</div>
+          <div className="explain-box mt-4" style={{ whiteSpace: 'pre-wrap' }}>{result.debrief}</div>
           <button className="btn btn-primary mt-4" onClick={loadScenario}>New Scenario</button>
         </div>
       )}

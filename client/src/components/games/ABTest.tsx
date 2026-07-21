@@ -55,12 +55,10 @@ export default function ABTestGame({ onComplete }: Props) {
       return { statisticalReasoning: 10, guardrailAwareness: 10, businessJudgment: 10, judgmentScore: 30, debrief: 'Please select an action and provide justification.' };
     }
 
-    // Check if action matches the correct action
     const expected = scenario.correctAction;
     const actionMatch = action === expected;
     const justificationWords = justification.split(/\s+/).filter(Boolean).length;
 
-    // Statistical reasoning: did they address p-value, overlapping CIs?
     const hasPvalue = /p.?value|significant|p\s*=|\d\.\d{2,}/i.test(justification);
     const hasCi = /ci|confidence|overlap?|interval/i.test(justification);
     const hasSegment = /segment|user|cohort|group|new.*return|heterogene/i.test(justification);
@@ -70,19 +68,17 @@ export default function ABTestGame({ onComplete }: Props) {
     const guardrailAwareness = hasGuardrail ? 25 : justificationWords >= 8 ? 15 : 10;
     const businessJudgment = actionMatch ? 25 : 10;
 
-    // Boost if they matched correct action but didn't articulate well
     const withActionBonus = actionMatch ? 2 : 0;
     const adjustedStatistical = Math.min(40, statisticalReasoning + withActionBonus);
     const judgmentScore = adjustedStatistical + guardrailAwareness + businessJudgment;
 
-    // Guardrail concerns text
     const guardrailConcerns = scenario.guardrails
       .filter(g => g.change.startsWith('+'))
       .map(g => `${g.metric} (${g.change})`)
       .join(', ');
 
     const debrief = actionMatch
-      ? `Correct decision. ${hasGuardrail ? 'Good guardrail awareness.' : guardrailConcerns ? `Note the guardrail concerns: ${guardrailConcerns}.` : ''} ${hasSegment ? 'You properly considered segment-level effects.' : 'A sharp read would also weigh the segment-level heterogeneity.'} ${scenario.explanation}`
+      ? `Correct decision. ${hasGuardrail ? 'Good guardrail awareness — you spotted the regressions.' : guardrailConcerns ? `Watch the guardrail concerns: ${guardrailConcerns}.` : ''} ${hasSegment ? 'You properly considered segment-level effects.' : 'A sharp read would also weigh the segment-level heterogeneity.'} ${scenario.explanation}`
       : `You chose "${action}". The recommended action is "${expected}". ${scenario.explanation} ${guardrailConcerns ? `Key guardrails to watch: ${guardrailConcerns}.` : ''} ${hasSegment ? 'Good segment awareness.' : 'Consider segment-level effects next time.'}`;
 
     return { statisticalReasoning: adjustedStatistical, guardrailAwareness, businessJudgment, judgmentScore, debrief };
@@ -90,23 +86,11 @@ export default function ABTestGame({ onComplete }: Props) {
 
   const handleSubmit = async () => {
     if (!scenario || !action) return;
+    // Compute grade synchronously BEFORE setting submitted state
+    const g = computeGrade();
+    setGrade(g);
     setSubmitted(true);
-    const data = await generate({
-      pool: 'grade',
-      system: 'You evaluate PMs on A/B test interpretation — statistical reasoning, guardrail awareness, and business judgment.',
-      prompt: `Test data: p=${scenario.pValue}, CIs overlap: ${scenario.overlappingCI}, segment detail: ${scenario.segmentDetail}.
-Guardrails: ${scenario.guardrails.map(g => `${g.metric} ${g.change}`).join(', ')}.
-Player's action: "${action}". Player's justification: """${justification}"""
-Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJudgment":0-30,"judgmentScore":<sum>,"debrief":"3-4 sentences explaining what a sharp read would have weighed"}`
-    });
-    if (data && typeof data.judgmentScore === 'number') {
-      setGrade(data);
-      onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'analytics');
-    } else {
-      const g = computeGrade();
-      setGrade(g);
-      onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
-    }
+    onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
   };
 
   if (loading && !scenario) return <LoadingState message="Generating experiment…" />;
@@ -149,7 +133,7 @@ Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJud
           </div>
           <button onClick={handleSubmit} disabled={!action || !justification || loading} className="btn btn-primary">{loading ? 'Grading…' : 'Submit'}</button>
         </>
-      ) : grade ? (
+      ) : grade && (
         <div>
           <Stamp tier={grade.judgmentScore >= 80 ? 'high' : grade.judgmentScore >= 55 ? 'mid' : 'low'}
             label={grade.judgmentScore >= 80 ? 'Sharp read' : grade.judgmentScore >= 55 ? 'Defensible' : 'Missed the real signal'}
@@ -161,8 +145,6 @@ Output JSON: {"statisticalReasoning":0-40,"guardrailAwareness":0-30,"businessJud
           <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}><p className="text-sm">{grade.debrief}</p></div>
           <button onClick={loadScenario} className="btn mt-5" disabled={loading}>{loading ? '…' : 'Next Test →'}</button>
         </div>
-      ) : (
-        <div className="panel"><p className="text-sm">Grading…</p></div>
       )}
     </GameLayout>
   );

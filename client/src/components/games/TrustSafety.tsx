@@ -48,19 +48,26 @@ export default function TrustSafety({ onComplete }: { onComplete: (xp: number, s
     const lower = answer.toLowerCase();
     const matchedCategories = scenario.policyCategories.filter((c: string) => lower.includes(c.toLowerCase().slice(0, 15)));
     const matchRate = matchedCategories.length / Math.max(scenario.policyCategories.length, 1);
-    const hasMitigation = lower.includes('mitigat') || lower.includes('balance') || lower.includes('trade') || lower.includes('allow') || lower.includes('restrict');
+    const hasMitigation = lower.includes('mitigat') || lower.includes('balance') || lower.includes('trade') || lower.includes('allow') || lower.includes('restrict') || lower.includes('review') || lower.includes('threshold') || lower.includes('escalation') || lower.includes('kill') || lower.includes('fallback');
     const ethicalReasoning = Math.round(33 * Math.min(1, matchRate + 0.4));
-    const businessPragmatism = Math.round(33 * (hasMitigation ? 0.8 : 0.3));
-    const mitigationConcreteness = Math.round(33 * Math.min(1, matchRate + 0.3));
+    const businessPragmatism = Math.round(33 * (hasMitigation ? 0.85 : 0.3));
+    const mitigationConcreteness = Math.round(33 * Math.min(1, matchRate + 0.4 + (hasMitigation ? 0.3 : 0)));
     const scores = { ethicalReasoning, businessPragmatism, mitigationConcreteness };
     const judgmentScore = Math.round((ethicalReasoning + businessPragmatism + mitigationConcreteness) / 3);
     const xp = Math.max(10, Math.round(judgmentScore / 100 * 30));
-    const topPolicies = scenario.policyCategories.slice(0, 2).join(', ');
-    setResult({
-      scores,
-      debrief: `A strong decision weighs both the upside and the specific policy concerns: ${topPolicies}. The best answers don't just pick a side — they propose a concrete mitigation that preserves value while reducing harm.`,
-      judgmentScore, xp
-    });
+
+    const allPolicies = scenario.policyCategories.join(', ');
+
+    let debrief = '';
+    if (hasMitigation && matchRate >= 0.5) {
+      debrief = `Strong decision. You balanced the ethical concerns with a concrete mitigation plan. The policies at play: ${allPolicies}. The issue (${scenario.issue}) requires careful enforcement — your approach preserves the upside while addressing the risk.`;
+    } else if (hasMitigation) {
+      debrief = `Good mitigation thinking. To strengthen, directly reference the relevant policy categories: ${allPolicies}. The issue here is ${scenario.issue}. A sharp answer explicitly names which policies apply and proposes specific guardrails.`;
+    } else {
+      debrief = `Consider a more concrete mitigation. Relevant policies: ${allPolicies}. The issue: ${scenario.issue}. Strong decisions propose specific mechanisms — review gates, escalation paths, kill-switches — rather than just taking a side.`;
+    }
+
+    setResult({ scores, debrief, judgmentScore, xp });
     setPhase('grade');
     onComplete(xp, 'strategy');
   }

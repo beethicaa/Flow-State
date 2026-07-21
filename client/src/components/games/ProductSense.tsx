@@ -54,7 +54,6 @@ export default function ProductSenseGame({ onComplete }: Props) {
     const firstWords = firstAnswer.split(/\s+/).filter(Boolean).length;
     const secondWords = secondAnswer.split(/\s+/).filter(Boolean).length;
 
-    // Score each dimension based on considerations
     const hasUserNeed = /user|need|pain|frustrat|problem/i.test(firstAnswer);
     const hasMetrics = /metric|measure|success|kpi|xp|rpm|ltv|retention|conversion|engagement/i.test(firstAnswer);
     const hasTradeoffs = /trade.?off|cost|risk|downside|limit|compete|priority|scope|effort|complexity|spend|decision|weigh|balance/i.test(firstAnswer);
@@ -69,15 +68,15 @@ export default function ProductSenseGame({ onComplete }: Props) {
     const rawScore = problemFraming + userEmpathy + tradeoffs + metrics + handledPushback;
     const judgmentScore = Math.round((rawScore / 25) * 100);
 
-    let debrief = '';
     const missing: string[] = [];
     if (!hasUserNeed) missing.push('explicit user need/empathy');
     if (!hasTradeoffs) missing.push('trade-off analysis');
     if (!hasMetrics) missing.push('metrics/success measurement');
     if (secondWords < 10) missing.push('a substantive pushback response');
 
+    let debrief = '';
     if (missing.length === 0) {
-      debrief = 'Strong answer across all dimensions. You covered user needs, trade-offs, metrics, and addressed the pushback effectively.';
+      debrief = `Strong answer across all dimensions. You covered user needs, trade-offs, metrics, and addressed the pushback effectively. ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
     } else if (missing.length <= 2) {
       debrief = `Good foundation. To strengthen: include ${missing.join(' and ')} in your answer. A top response would also reference the specific constraint (engineering capacity, competitive threat, timeline). ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
     } else {
@@ -89,28 +88,13 @@ export default function ProductSenseGame({ onComplete }: Props) {
 
   async function handleSecondSubmit() {
     if (!scenario) return;
+    // Compute grade synchronously BEFORE setting phase, so grade is available on next render
+    const g = computeGrade();
+    setGrade(g);
     setPhase('done');
-    const data = await generate({
-      pool: 'grade',
-      system: 'You grade PM answers across 5 dimensions. Be specific and demanding.',
-      prompt: `Prompt: "${scenario.prompt}". Rubric: "${scenario.rubric}".
-First answer: """${firstAnswer}"""
-Follow-up: "${skepticPushback}"
-Follow-up response: """${secondAnswer}"""
-Output JSON: {"problemFraming":0-5,"userEmpathy":0-5,"tradeoffs":0-5,"metrics":0-5,"handledPushback":0-5,"judgmentScore":<sum/25*100>,"debrief":"2-3 sentences, note if they addressed the pushback or deflected"}`
-    });
-    if (data && typeof data.judgmentScore === 'number') {
-      setGrade(data);
-      const strategyXp = Math.round((data.judgmentScore || 50) * 0.4 * 0.6);
-      const commXp = Math.round((data.judgmentScore || 50) * 0.4 * 0.4);
-      onComplete(strategyXp + commXp, 'strategy');
-    } else {
-      const g = computeGrade();
-      setGrade(g);
-      const strategyXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.6);
-      const commXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.4);
-      onComplete(strategyXp + commXp, 'strategy');
-    }
+    const strategyXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.6);
+    const commXp = Math.round((g.judgmentScore || 50) * 0.4 * 0.4);
+    onComplete(strategyXp + commXp, 'strategy');
   }
 
   if (loading && !scenario) return <LoadingState message="Generating scenario…" />;
