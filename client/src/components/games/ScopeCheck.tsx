@@ -33,30 +33,55 @@ Vary whether the estimate is justified or padded.${isBoss ? ' Make this delibera
     if (result) { setData(result as Scenario); setAnswer(''); setGrade(null); }
   }
 
-  async function submitAnswer() {
-    if (!answer.trim() || !data || submitting) return;
-    setSubmitting(true);
-    const result = await generate({
-      pool: 'grade',
-      system: "You are an exacting PM interviewer grading scope negotiation responses.",
-      prompt: `Grade this answer to a scope-check exercise. Output JSON: {"technicalCuriosity":0-33,"collaborativeTone":0-33,"scopeJudgment":0-33,"judgmentScore":0-100,"debrief":"2-3 sentences explaining what they missed and what a strong answer looks like"}
-
-Ask: ${data.ask}
-Engineer estimate: ${data.engineerEstimate}
-Engineer reasoning: ${data.engineerReasoning}
-Stakes: ${data.stakes}
-Strong answer looks like: ${data.strongAnswerLooksLike}
-Player answer: ${answer}`
-    });
-    if (result) {
-      const g = result as Grade;
-      setGrade(g);
-      const xp = Math.round((g.judgmentScore / 100) * 40 + (isBoss ? 20 : 0));
-      storage.playGame('execution', Math.round(xp * 0.6), 'scope');
-      storage.playGame('communication', Math.round(xp * 0.4), 'scope');
-      onComplete(xp, 'execution/communication', isBoss, g.judgmentScore, g.debrief, answer);
+  function computeGrade(): Grade {
+    if (!data) {
+      return { technicalCuriosity: 10, collaborativeTone: 10, scopeJudgment: 10, judgmentScore: 30, debrief: 'No scenario loaded.' };
     }
-    setSubmitting(false);
+
+    const lower = answer.toLowerCase();
+    const words = answer.split(/\s+/).filter(Boolean).length;
+
+    // Technical curiosity: did they ask about the estimate?
+    const hasTechCuriosity = /why|how|what makes|assumption|breakdown|margin|pad|buffer|risk|complex|uncertain/i.test(lower);
+    // Collaborative tone: are they working WITH engineering?
+    const hasCollaborative = /together|collaborate|partner|work with|let's|we could|suggest|propose|discuss|align|explore|understand|help/i.test(lower);
+    // Scope judgment: do they consider trade-offs?
+    const hasScopeJudgment = /scope|cut|phase|mvp|minimum|v1|trade.?off|alternative|option|split|priority|essential|core|defer/i.test(lower);
+    // Stakes awareness
+    const hasStakes = /stake|deadline|board|customer|investor|revenue|impact|critical|important|urgent/i.test(lower);
+
+    const technicalCuriosity = hasTechCuriosity ? 28 : 12;
+    const collaborativeTone = hasCollaborative ? 28 : 12;
+    const scopeJudgment = hasScopeJudgment && words >= 10 ? 28 : hasScopeJudgment ? 18 : 10;
+    const judgmentScore = Math.min(100, technicalCuriosity + collaborativeTone + scopeJudgment);
+
+    const missing: string[] = [];
+    if (!hasTechCuriosity) missing.push('question the estimate');
+    if (!hasCollaborative) missing.push('collaborative framing');
+    if (!hasScopeJudgment) missing.push('scope negotiation');
+    if (!hasStakes) missing.push('acknowledge the stakes');
+
+    let debrief = '';
+    if (missing.length === 0) {
+      debrief = `Strong response. You questioned the estimate, maintained a collaborative tone, negotiated scope, and acknowledged the stakes. ${data.strongAnswerLooksLike}`;
+    } else if (missing.length <= 2) {
+      debrief = `Good start. To strengthen, ${missing.join(' and ')}. ${data.strongAnswerLooksLike}`;
+    } else {
+      debrief = `Your response needs more depth. Key gaps: ${missing.join(', ')}. ${data.strongAnswerLooksLike}`;
+    }
+
+    return { technicalCuriosity, collaborativeTone, scopeJudgment, judgmentScore, debrief };
+  }
+
+  function submitAnswer() {
+    if (!answer.trim() || !data || submitting) return;
+    const g = computeGrade();
+    setGrade(g);
+    setSubmitting(true);
+    const xp = Math.round((g.judgmentScore / 100) * 40 + (isBoss ? 20 : 0));
+    storage.playGame('execution', Math.round(xp * 0.6), 'scope');
+    storage.playGame('communication', Math.round(xp * 0.4), 'scope');
+    onComplete(xp, 'execution/communication', isBoss, g.judgmentScore, g.debrief, answer);
   }
 
   if (loading && !data) return <LoadingState message="Reading the ticket…" />;
@@ -75,7 +100,7 @@ Player answer: ${answer}`
       <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 14 }}>{data.stakes}</div>
       <textarea className="sense-textarea" placeholder="How do you respond to move this forward?" value={answer} onChange={e => setAnswer(e.target.value)} />
       <div style={{ marginTop: 12 }}>
-        <button className="btn btn-primary" disabled={!answer.trim() || submitting} onClick={submitAnswer}>{submitting ? 'Grading…' : 'Submit response →'}</button>
+        <button className="btn btn-primary" disabled={!answer.trim() || submitting} onClick={submitAnswer}>{submitting ? 'Graded' : 'Submit response →'}</button>
       </div>
       {grade && (
         <>

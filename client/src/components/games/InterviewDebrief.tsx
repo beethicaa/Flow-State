@@ -35,29 +35,46 @@ Keep transcript 150-250 words.${isBoss ? ' Make this deliberately harder: less c
     if (result) { setData(result as Scenario); setAnswer(''); setGrade(null); }
   }
 
-  async function submitAnswer() {
-    if (!answer.trim() || !data || submitting) return;
-    setSubmitting(true);
-    const result = await generate({
-      pool: 'grade',
-      system: "You are an exacting PM interviewer grading qualitative reasoning.",
-      prompt: `Grade this answer to an interview-debrief exercise. Output JSON: {"signalVsNoise":0-33,"biasAwareness":0-33,"validationRigor":0-33,"judgmentScore":0-100,"debrief":"2-3 sentences explaining what they missed and what a strong answer looks like"}
-
-Goal: ${data.researchGoal}
-Transcript: ${data.transcript.map(t => `${t.speaker}: ${t.text}`).join('\n')}
-Real insight: ${data.realInsight}
-Tempting misreads: ${data.temptingMisreads}
-Player answer: ${answer}`
-    });
-    if (result) {
-      const g = result as Grade;
-      setGrade(g);
-      const xp = Math.round((g.judgmentScore / 100) * 40 + (isBoss ? 20 : 0));
-      storage.playGame('strategy', Math.round(xp * 0.6), 'interview');
-      storage.playGame('communication', Math.round(xp * 0.4), 'interview');
-      onComplete(xp, 'strategy/communication', isBoss, g.judgmentScore, g.debrief, answer);
+  function computeGrade(): Grade {
+    if (!data) {
+      return { signalVsNoise: 10, biasAwareness: 10, validationRigor: 10, judgmentScore: 30, debrief: 'No scenario loaded.' };
     }
-    setSubmitting(false);
+
+    const lower = answer.toLowerCase();
+    const words = answer.split(/\s+/).filter(Boolean).length;
+
+    // Check if they address the real insight or fall for tempting misreads
+    const hasRealInsight = data.realInsight && lower.includes(data.realInsight.toLowerCase().slice(0, 20));
+    const avoidsTempting = data.temptingMisreads && !lower.includes(data.temptingMisreads.toLowerCase().slice(0, 20));
+    const hasBiasAwareness = /bias|assumption|confirm|misread|overinterpret|sample|small|noise/i.test(lower);
+    const hasValidation = /validate|verify|test|follow.up|second study|quant|survey|a.b|experiment/i.test(lower);
+
+    const signalVsNoise = words >= 15 && hasRealInsight ? 28 : words >= 8 ? 18 : 10;
+    const biasAwareness = hasBiasAwareness ? 28 : 12;
+    const validationRigor = hasValidation ? 28 : 12;
+    const judgmentScore = Math.min(100, signalVsNoise + biasAwareness + validationRigor);
+
+    let debrief = '';
+    if (hasRealInsight && hasValidation) {
+      debrief = `Strong insight. You identified the real signal: ${data.realInsight}. ${hasBiasAwareness ? 'Good bias awareness.' : 'Watch for confirmation bias — the tempting misread is: ' + data.temptingMisreads} ${data.strongAnswerLooksLike}`;
+    } else if (hasRealInsight) {
+      debrief = `You correctly identified the real insight: ${data.realInsight}. To strengthen, propose how you'd validate it further. ${data.strongAnswerLooksLike}`;
+    } else {
+      debrief = `Your analysis missed the core insight. Real insight: ${data.realInsight}. ${data.strongAnswerLooksLike}. ${avoidsTempting ? 'Good that you avoided the tempting misread.' : 'Watch out for: ' + data.temptingMisreads}`;
+    }
+
+    return { signalVsNoise, biasAwareness, validationRigor, judgmentScore, debrief };
+  }
+
+  function submitAnswer() {
+    if (!answer.trim() || !data || submitting) return;
+    const g = computeGrade();
+    setGrade(g);
+    setSubmitting(true);
+    const xp = Math.round((g.judgmentScore / 100) * 40 + (isBoss ? 20 : 0));
+    storage.playGame('strategy', Math.round(xp * 0.6), 'interview');
+    storage.playGame('communication', Math.round(xp * 0.4), 'interview');
+    onComplete(xp, 'strategy/communication', isBoss, g.judgmentScore, g.debrief, answer);
   }
 
   if (loading && !data) return <LoadingState message="Pulling the field notes…" />;
@@ -77,7 +94,7 @@ Player answer: ${answer}`
       </div>
       <textarea className="sense-textarea" placeholder="What's the real insight here — and what would you deliberately NOT conclude from this alone?" value={answer} onChange={e => setAnswer(e.target.value)} />
       <div style={{ marginTop: 12 }}>
-        <button className="btn btn-primary" disabled={!answer.trim() || submitting} onClick={submitAnswer}>{submitting ? 'Grading…' : 'Submit debrief →'}</button>
+        <button className="btn btn-primary" disabled={!answer.trim() || submitting} onClick={submitAnswer}>{submitting ? 'Graded' : 'Submit debrief →'}</button>
       </div>
       {grade && (
         <>
