@@ -84,16 +84,23 @@ export default function ABTestGame({ onComplete }: Props) {
     return { statisticalReasoning: adjustedStatistical, guardrailAwareness, businessJudgment, judgmentScore, debrief };
   }
 
-  const handleSubmit = async () => {
+  function handleSubmit(e?: React.MouseEvent) {
+    e?.preventDefault();
     if (!scenario || !action) return;
-    // Compute grade synchronously BEFORE setting submitted state
+    // Compute grade first, then set both states together
     const g = computeGrade();
     setGrade(g);
     setSubmitted(true);
     onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
-  };
+  }
 
-  if (loading && !scenario) return <LoadingState message="Generating experiment…" />;
+  if (loading && !scenario) {
+    return (
+      <GameLayout title="A/B Test Autopsy" subtitle="Analytics" icon="↔" iconBg="bg-gradient-to-br from-teal-700 to-teal/60">
+        <LoadingState message="Generating experiment…" />
+      </GameLayout>
+    );
+  }
   if (error && !scenario) return <ErrorState message={error} onRetry={loadScenario} />;
   if (!scenario) return null;
 
@@ -124,7 +131,7 @@ export default function ABTestGame({ onComplete }: Props) {
           <div className="text-xs font-mono uppercase mb-2" style={{ color: 'var(--ink-soft)' }}>What do you do?</div>
           <div className="flex flex-wrap gap-2 mb-4">
             {ACTIONS.map(a => (
-              <button key={a} onClick={() => setAction(a)} className={`btn ${action === a ? 'btn-primary' : ''}`}>{a}</button>
+              <button key={a} onClick={(e) => { e.preventDefault(); setAction(a); }} className={`btn ${action === a ? 'btn-primary' : ''}`}>{a}</button>
             ))}
           </div>
           <div className="mb-4">
@@ -143,7 +150,7 @@ export default function ABTestGame({ onComplete }: Props) {
           <RubricRow label="Guardrail awareness" score={grade.guardrailAwareness} max={30} />
           <RubricRow label="Business judgment" score={grade.businessJudgment} max={30} />
           <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}><p className="text-sm">{grade.debrief}</p></div>
-          <button onClick={loadScenario} className="btn mt-5" disabled={loading}>{loading ? '…' : 'Next Test →'}</button>
+          <button onClick={loadScenario} disabled={loading} className="btn mt-5">{loading ? '…' : 'Next Test →'}</button>
         </div>
       )}
     </GameLayout>
