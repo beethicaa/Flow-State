@@ -2,21 +2,66 @@ import { useState, useRef, useEffect } from 'react';
 import { useGenerate } from '../../hooks/useGenerate';
 import GameLayout, { LoadingState, ErrorState, Stamp, RubricRow, JudgmentScore } from '../GameLayout';
 
+interface ABPoolScenario {
+  variantA: { label: string; users: number; conversions: number; rate: string };
+  variantB: { label: string; users: number; conversions: number; rate: string };
+  pValue: string;
+  guardrails: { metric: string; control: string; variant: string; concern: boolean; explanation?: string }[];
+  correctAnswer: string;
+  correctLabel: string;
+  explanation: string;
+  trap: string;
+}
+
+interface MappedScenario {
+  variants: [Variant, Variant];
+  pValue: number;
+  guardrails: { metric: string; change: string }[];
+  correctAction: string;
+  explanation: string;
+  trap: string;
+  overlappingCI: boolean;
+  segmentDetail: string;
+}
+
 interface Variant { name: string; rate: number; sample: number; }
 interface Guardrail { metric: string; change: string; }
-interface Scenario {
-  variants: [Variant, Variant]; pValue: number; guardrails: Guardrail[];
-  overlappingCI: boolean; segmentDetail: string;
-  correctAction: string; explanation: string;
-}
 interface Grade { statisticalReasoning: number; guardrailAwareness: number; businessJudgment: number; judgmentScore: number; debrief: string; }
 interface Props { onComplete: (xp: number, skill: string) => void; }
 
 const ACTIONS = ['Ship it', 'Kill it', 'Run it longer', 'Ship with guardrail fix'];
 
+function mapPoolToScenario(pool: ABPoolScenario): MappedScenario {
+  const pVal = parseFloat(pool.pValue);
+  return {
+    variants: [
+      { name: pool.variantA.label, rate: parseFloat(pool.variantA.rate) / 100, sample: pool.variantA.users },
+      { name: pool.variantB.label, rate: parseFloat(pool.variantB.rate) / 100, sample: pool.variantB.users }
+    ],
+    pValue: isNaN(pVal) ? 0.05 : pVal,
+    guardrails: pool.guardrails.map(g => {
+      const ctrl = parseFloat(g.control);
+      const varnt = parseFloat(g.variant);
+      if (!isNaN(ctrl) && !isNaN(varnt)) {
+        const diff = varnt - ctrl;
+        return { metric: g.metric, change: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%` };
+      }
+      return { metric: g.metric, change: g.variant };
+    }),
+    correctAction: pool.correctAnswer === 'ship' ? 'Ship it' :
+                   pool.correctAnswer === 'kill' ? 'Kill it' :
+                   pool.correctAnswer === 'run_longer' ? 'Run it longer' :
+                   pool.correctAnswer === 'ship_guardrail' ? 'Ship with guardrail fix' : 'Ship it',
+    explanation: pool.explanation,
+    trap: pool.trap,
+    overlappingCI: pVal > 0.04 && pVal < 0.06,
+    segmentDetail: pool.trap
+  };
+}
+
 export default function ABTestGame({ onComplete }: Props) {
   const { generate, loading, error, reset } = useGenerate();
-  const [scenario, setScenario] = useState<Scenario | null>(null);
+  const [scenario, setScenario] = useState<MappedScenario | null>(null);
   const [action, setAction] = useState<string | null>(null);
   const [justification, setJustification] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -34,7 +79,8 @@ export default function ABTestGame({ onComplete }: Props) {
     setGrade(null);
     setAction(null);
     setJustification('');
-    const data = await generate({
+
+    const raw = await generate({
       system: 'You design A/B test scenarios with statistical traps for PMs.',
       prompt: `Generate an A/B test scenario with traps. Include overlapping CIs, a segment-level heterogeneity detail, and guardrail metrics. Output JSON:
 {
@@ -47,7 +93,10 @@ export default function ABTestGame({ onComplete }: Props) {
   "explanation": "3-4 sentences on what a sharp PM would weigh, including the segment split if present"
 }`
     });
-    if (data) setScenario(data);
+
+    if (raw && typeof raw === 'object' && 'variantA' in raw) {
+      setScenario(mapPoolToScenario(raw as ABPoolScenario));
+    }
   }
 
   function computeGrade(): Grade {
@@ -87,7 +136,6 @@ export default function ABTestGame({ onComplete }: Props) {
   function handleSubmit(e?: React.MouseEvent) {
     e?.preventDefault();
     if (!scenario || !action) return;
-    // Compute grade first, then set both states together
     const g = computeGrade();
     setGrade(g);
     setSubmitted(true);
