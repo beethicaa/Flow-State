@@ -44,10 +44,14 @@ Keep transcript 150-250 words.${isBoss ? ' Make this deliberately harder: less c
     const words = answer.split(/\s+/).filter(Boolean).length;
 
     // Check if they address the real insight or fall for tempting misreads
-    const hasRealInsight = data.realInsight && lower.includes(data.realInsight.toLowerCase().slice(0, 20));
-    const avoidsTempting = data.temptingMisreads && !lower.includes(data.temptingMisreads.toLowerCase().slice(0, 20));
-    const hasBiasAwareness = /bias|assumption|confirm|misread|overinterpret|sample|small|noise/i.test(lower);
-    const hasValidation = /validate|verify|test|follow.up|second study|quant|survey|a.b|experiment/i.test(lower);
+    const realInsightSlice = data.realInsight.toLowerCase().slice(0, 20);
+    const temptingSlice = data.temptingMisreads.toLowerCase().slice(0, 20);
+    const hasRealInsight = data.realInsight && lower.includes(realInsightSlice);
+    const fellForTempting = data.temptingMisreads && lower.includes(temptingSlice);
+    const avoidsTempting = data.temptingMisreads && !fellForTempting;
+    const hasBiasAwareness = /bias|assumption|confirm|misread|overinterpret|sample|small|noise|anecdote|selection/i.test(lower);
+    const hasValidation = /validate|verify|test|follow.?up|second study|quant|survey|a.b|experiment|cohort|segment/i.test(lower);
+    const hasBusinessImplication = /feature|roadmap|prioritize|build|improve|change|fix|opportunity|risk/i.test(lower);
 
     const signalVsNoise = words >= 15 && hasRealInsight ? 28 : words >= 8 ? 18 : 10;
     const biasAwareness = hasBiasAwareness ? 28 : 12;
@@ -55,12 +59,18 @@ Keep transcript 150-250 words.${isBoss ? ' Make this deliberately harder: less c
     const judgmentScore = Math.min(100, signalVsNoise + biasAwareness + validationRigor);
 
     let debrief = '';
-    if (hasRealInsight && hasValidation) {
-      debrief = `Strong insight. You identified the real signal: ${data.realInsight}. ${hasBiasAwareness ? 'Good bias awareness.' : 'Watch for confirmation bias — the tempting misread is: ' + data.temptingMisreads} ${data.strongAnswerLooksLike}`;
+    if (hasRealInsight && hasValidation && hasBusinessImplication) {
+      debrief = `Strong insight. You identified the real signal: "${data.realInsight}". You also connected it to what the team should actually do — that's the leap most people miss. ${hasBiasAwareness ? 'Your bias awareness is sharp.' : 'Watch for confirmation bias — the tempting misread is: ' + data.temptingMisreads} ${data.strongAnswerLooksLike}`;
+    } else if (hasRealInsight && hasValidation) {
+      debrief = `You correctly identified the real insight: "${data.realInsight}". To strengthen, close the loop with a concrete next step — what would the team build or validate? ${data.strongAnswerLooksLike}`;
     } else if (hasRealInsight) {
-      debrief = `You correctly identified the real insight: ${data.realInsight}. To strengthen, propose how you'd validate it further. ${data.strongAnswerLooksLike}`;
+      debrief = `You spotted the real insight: "${data.realInsight}". But insight without action is just trivia. A senior PM would propose how to validate this further (follow-up study, cohort analysis, A/B test) and what it means for the roadmap. ${data.strongAnswerLooksLike}`;
+    } else if (fellForTempting) {
+      debrief = `You fell for the tempting misread: "${data.temptingMisreads}". The real signal in this transcript is different: ${data.realInsight}. User research is messy — the skill is separating what one user said from what the pattern actually means. ${data.strongAnswerLooksLike}`;
+    } else if (avoidsTempting) {
+      debrief = `Good — you avoided the tempting misread. The real signal is: ${data.realInsight}. To sharpen further, explicitly contrast it with the misread you avoided, and propose a validation plan. ${data.strongAnswerLooksLike}`;
     } else {
-      debrief = `Your analysis missed the core insight. Real insight: ${data.realInsight}. ${data.strongAnswerLooksLike}. ${avoidsTempting ? 'Good that you avoided the tempting misread.' : 'Watch out for: ' + data.temptingMisreads}`;
+      debrief = `Your analysis missed the core insight. The transcript contains a real signal, but it's buried: ${data.realInsight}. ${data.strongAnswerLooksLike}. The tempting misread to watch out for: ${data.temptingMisreads}`;
     }
 
     return { signalVsNoise, biasAwareness, validationRigor, judgmentScore, debrief };
