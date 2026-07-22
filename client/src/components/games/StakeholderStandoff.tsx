@@ -76,16 +76,36 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
   async function generateResolution(fullTranscript: string[]) {
     if (!scenario) return;
     const res = await generate({
-      system: 'You are the stakeholder in a workplace negotiation. Given the conversation so far, write a brief closing reaction (1-2 sentences) showing how they respond to the PM\'s last line — acceptance, tension, or qualified agreement. Do NOT summarize. Just their final words.',
-      prompt: `Stakeholder: ${scenario.stakeholder}. Underlying concern: "${scenario.underlyingConcern}". Full conversation so far: "${fullTranscript.join(' | ')}". Write their closing reaction.`
+      system: 'You are the stakeholder in a workplace negotiation. Write ONLY their final spoken reaction to the PM\'s last line — exactly 1 sentence, in character. No narration, no quotes around it.',
+      prompt: `Role: ${scenario.stakeholder}. Concern: "${scenario.underlyingConcern}". Conversation history: "${fullTranscript.join(' | ')}". Write ONLY their final sentence.`
     });
-    if (res && typeof res === 'object' && 'line' in res) {
-      setResolution((res as any).line);
-    } else if (res && typeof res === 'string') {
-      setResolution(res);
+    const raw = (res && typeof res === 'object' && 'line' in res) ? (res as any).line : (typeof res === 'string' ? res : '');
+    const cleaned = String(raw).trim().replace(/^["']|["']$/g, '').replace(/^(They|Stakeholder|Jordan|Raj|Alex) says:\s*/i, '');
+    if (cleaned.length >= 3) {
+      setResolution(cleaned);
     } else {
-      setResolution('Let me think on that and circle back.');
+      setResolution(getFallbackResolution(trust));
     }
+  }
+
+  function getFallbackResolution(trustLevel: number): string {
+    const high = [
+      "Fair. Let's align on the specifics by EOD.",
+      "Okay — but I want a written follow-up.",
+      "That works. Let's iterate from here."
+    ];
+    const mid = [
+      "I'll go along, but I'm not convinced yet.",
+      "Fine. But if this regresses, we're resetting.",
+      "Sure. Though I'd feel better with a timeline."
+    ];
+    const low = [
+      "I'll do it — but don't expect me to be happy about it.",
+      "This isn't settled. We'll talk Thursday.",
+      "Complying for now. The data will tell us who's right."
+    ];
+    const pool = trustLevel >= 60 ? high : trustLevel >= 35 ? mid : low;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   function localGrade(finalTrust: number, fullTranscript: string[]): Grade {
