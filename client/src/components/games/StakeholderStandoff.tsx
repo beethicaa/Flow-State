@@ -17,6 +17,7 @@ export default function StandoffGame({ onComplete }: Props) {
   const [transcript, setTranscript] = useState<string[]>([]);
   const [grade, setGrade] = useState<Grade | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [resolution, setResolution] = useState<string | null>(null);
   const genRef = useRef(false);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function StandoffGame({ onComplete }: Props) {
   }, []);
 
   async function loadScenario() {
-    reset(); setScenario(null); setTrust(50); setTurnIdx(0); setTranscript([]); setGrade(null); setSubmitted(false);
+    reset(); setScenario(null); setTrust(50); setTurnIdx(0); setTranscript([]); setGrade(null); setSubmitted(false); setResolution(null);
     const data = await generate({
       system: 'You design stakeholder dialogue trees for PM communication training. At least one high-trust option should actually be the wrong move (placating without addressing the underlying concern).',
       prompt: `Generate a 3-turn stakeholder standoff. Output JSON:
@@ -63,8 +64,27 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
     if (isLast) {
       setSubmitted(true);
       gradeSubmission(newTrust, [...transcript, opt.line]);
+    } else if (turnIdx === scenario.turns.length - 2) {
+      // After user's second-to-last turn, generate a brief resolution/closing from the stakeholder
+      generateResolution([...transcript, opt.line]);
+      setTurnIdx(t => t + 1);
     } else {
       setTurnIdx(t => t + 1);
+    }
+  }
+
+  async function generateResolution(fullTranscript: string[]) {
+    if (!scenario) return;
+    const res = await generate({
+      system: 'You are the stakeholder in a workplace negotiation. Given the conversation so far, write a brief closing reaction (1-2 sentences) showing how they respond to the PM\'s last line — acceptance, tension, or qualified agreement. Do NOT summarize. Just their final words.',
+      prompt: `Stakeholder: ${scenario.stakeholder}. Underlying concern: "${scenario.underlyingConcern}". Full conversation so far: "${fullTranscript.join(' | ')}". Write their closing reaction.`
+    });
+    if (res && typeof res === 'object' && 'line' in res) {
+      setResolution((res as any).line);
+    } else if (res && typeof res === 'string') {
+      setResolution(res);
+    } else {
+      setResolution('Let me think on that and circle back.');
     }
   }
 
@@ -166,6 +186,12 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
           <RubricRow label="De-escalation" score={grade.deEscalation} max={33} />
           <RubricRow label="Transparency" score={grade.transparency} max={33} />
           <RubricRow label="Outcome" score={grade.outcome} max={33} />
+          {resolution && (
+            <div className="panel mt-3" style={{ background: 'var(--paper-alt)', borderLeft: '3px solid var(--purple)' }}>
+              <p className="text-xs font-mono uppercase mb-1" style={{ color: 'var(--ink-soft)' }}>Their closing line</p>
+              <p className="text-sm hand" style={{ color: 'var(--ink)' }}>"{resolution}"</p>
+            </div>
+          )}
           <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}>
             <p className="text-xs font-mono uppercase mb-1" style={{ color: 'var(--ink-soft)' }}>Hidden concern: {scenario.underlyingConcern}</p>
             <p className="text-sm">{grade.debrief}</p>
