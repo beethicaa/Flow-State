@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import GameLayout, { LoadingState, JudgmentScore } from '../GameLayout';
+import GameLayout, { LoadingState, JudgmentScore, RubricRow, Stamp } from '../GameLayout';
 import { postmortemPool } from '../../scenarios/index';
 import { useStorage } from '../../hooks/useStorage';
 
@@ -54,17 +54,16 @@ export default function Postmortem({ onComplete }: { onComplete: (xp: number, sk
     const judgmentScore = Math.round((blamelessness + rootCauseRigor + actionability) / 3);
     const xp = Math.max(10, Math.round(judgmentScore / 100 * 30));
 
-    // Contextual debrief using specific scenario data
-    const whatWentWrongItems = scenario.whatWentWrong?.join('; ') || '';
-    const actionItemsList = scenario.actionItems?.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n') || '';
+    const whatWentWrongStr = scenario.whatWentWrong?.join('; ') || '';
+    const actionItemsStr = scenario.actionItems?.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n') || '';
 
     let debrief = '';
     if (hasBlameless && matchRate >= 0.5) {
-      debrief = `Strong postmortem. You identified the systemic issues and proposed concrete fixes. The key failure points to address: ${whatWentWrongItems}. Recommended actions:\n${actionItemsList}`;
+      debrief = `Strong postmortem. You identified the systemic issues and proposed concrete, scenario-specific fixes. For this incident: ${whatWentWrongStr}. The strongest action items from your answer mapped well to the recommended list:\n${actionItemsStr}. A senior PM would also document the timeline precisely and assign owners with deadlines.`;
     } else if (hasBlameless) {
-      debrief = `Good blameless framing. For deeper root cause analysis, explicitly connect each failure to an action item. What went wrong: ${whatWentWrongItems}. Key action items: ${actionItemsList}`;
+      debrief = `Good blameless framing. You focused on systems, which is the right starting point. For this incident specifically: ${whatWentWrongStr}. To strengthen the postmortem, connect each failure mode to a concrete action item with an owner. Recommended actions:\n${actionItemsStr}`;
     } else {
-      debrief = `Your postmortem identified some issues. Aim for a blameless tone that focuses on systems, not people. What went wrong: ${whatWentWrongItems}. Strong action items to consider:\n${actionItemsList}`;
+      debrief = `Your postmortem noted some issues but stayed surface-level. For this incident: ${whatWentWrongStr}. A sharp PM writes a postmortem that prevents recurrence — not a blame document. Key action items to consider:\n${actionItemsStr}`;
     }
 
     setResult({ scores, debrief, judgmentScore, xp });
@@ -98,15 +97,13 @@ export default function Postmortem({ onComplete }: { onComplete: (xp: number, sk
       )}
       {result && phase === 'grade' && (
         <div>
+          <Stamp tier={result.judgmentScore >= 80 ? 'high' : result.judgmentScore >= 55 ? 'mid' : 'low'}
+            label={result.judgmentScore >= 80 ? 'Sharp read' : result.judgmentScore >= 55 ? 'Defensible' : 'Missed the real signal'}
+            xp={result.xp} />
           <JudgmentScore score={result.judgmentScore} />
-          <div className="grade-grid">
-            {Object.entries(result.scores).map(([k, v]) => (
-              <div key={k} className="grade-row">
-                <div className="lbl">{k.replace(/([A-Z])/g, ' $1')}<span>{v as number}/33</span></div>
-                <div className="track"><div className="fill" style={{ width: `${(v as number)/33*100}%` }}></div></div>
-              </div>
-            ))}
-          </div>
+          <RubricRow label="Blameless tone" score={result.scores.blamelessness} max={33} />
+          <RubricRow label="Root cause rigor" score={result.scores.rootCauseRigor} max={33} />
+          <RubricRow label="Actionability" score={result.scores.actionability} max={33} />
           <div className="explain-box mt-4" style={{ whiteSpace: 'pre-wrap' }}>{result.debrief}</div>
           <button className="btn btn-primary mt-4" onClick={loadScenario}>New Scenario</button>
         </div>

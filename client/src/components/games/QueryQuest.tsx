@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGenerate } from '../../hooks/useGenerate';
-import GameLayout, { LoadingState, ErrorState, JudgmentScore } from '../GameLayout';
+import GameLayout, { LoadingState, ErrorState, JudgmentScore, RubricRow, Stamp } from '../GameLayout';
 
 const BUG_TYPES = ['wrong_join', 'off_by_one_date', 'double_counting', 'missing_filter', 'wrong_aggregation'] as const;
 const BUG_LABELS: Record<string, string> = {
@@ -11,13 +11,29 @@ const BUG_LABELS: Record<string, string> = {
   wrong_aggregation: 'Wrong aggregation function'
 };
 
+interface Scenario {
+  businessQuestion: string;
+  query: string;
+  bugType: string;
+  bugExplanation: string;
+  whatWentUnnoticed: string;
+  correctedQuery: string;
+}
+
+interface Grade {
+  bugIdentification: number;
+  explanation: number;
+  judgmentScore: number;
+  feedback: string;
+}
+
 export default function QueryQuest({ onComplete }: { onComplete: (xp: number, skill: string) => void }) {
   const { generate, loading, error, reset } = useGenerate();
-  const [scenario, setScenario] = useState<any>(null);
+  const [scenario, setScenario] = useState<Scenario | null>(null);
   const [selectedBug, setSelectedBug] = useState<string | null>(null);
   const [explanation, setExplanation] = useState('');
   const [phase, setPhase] = useState<'play' | 'grade'>('play');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Grade | null>(null);
   const genRef = { current: false };
 
   useEffect(() => {
@@ -35,15 +51,15 @@ export default function QueryQuest({ onComplete }: { onComplete: (xp: number, sk
     setPhase('play');
     setResult(null);
     const r = await generate({
-      system: 'You design SQL-debugging exercises for PM data-literacy practice.',
-      prompt: `Invent a business question and a SQL query someone wrote to answer it, containing exactly one bug. Output JSON:
+      system: 'You design SQL debugging scenarios for PM data literacy training. The bugs should be subtle — things that pass code review but produce wrong numbers.',
+      prompt: `Invent a SQL debugging scenario. Output JSON:
 {
   "businessQuestion": "the question the query is supposed to answer",
-  "query": "the SQL, formatted with newlines, as a single string",
-  "bugType": "wrong_join" | "off_by_one_date" | "double_counting" | "missing_filter" | "wrong_aggregation",
+  "query": "SQL with one subtle bug, formatted with newlines",
+  "bugType": "wrong_join|off_by_one_date|double_counting|missing_filter|wrong_aggregation",
   "bugExplanation": "2-3 sentences on exactly what's wrong and what number it produces instead",
-  "whatWentUnnoticed": "1 sentence on why this would slip past a quick glance",
-  "correctedQuery": "the fixed version of the query"
+  "whatWentUnnoticed": "1 sentence on why this passes code review but breaks analysis",
+  "correctedQuery": "the fixed version"
 }`
     });
     if (r) setScenario(r);
@@ -60,7 +76,8 @@ export default function QueryQuest({ onComplete }: { onComplete: (xp: number, sk
     const explanationScore = gradeResult?.score || 0;
     const judgmentScore = bugScore + explanationScore;
     const xp = Math.round(judgmentScore / 100 * 30);
-    setResult({ judgmentScore, bugScore, explanationScore, feedback: gradeResult?.feedback || '', xp });
+    const feedback = gradeResult?.feedback || '';
+    setResult({ bugIdentification: bugScore, explanation: explanationScore, judgmentScore, feedback });
     setPhase('grade');
     onComplete(Math.max(10, xp), 'analytics');
   }
@@ -89,10 +106,15 @@ export default function QueryQuest({ onComplete }: { onComplete: (xp: number, sk
       )}
       {result && phase === 'grade' && (
         <div>
+          <Stamp tier={result.judgmentScore >= 80 ? 'high' : result.judgmentScore >= 40 ? 'mid' : 'low'}
+            label={result.judgmentScore >= 80 ? 'Sharp read' : result.judgmentScore >= 40 ? 'Defensible' : 'Missed the real signal'}
+            xp={Math.round(result.judgmentScore * 0.3)} />
           <JudgmentScore score={result.judgmentScore} />
+          <RubricRow label="Bug identification" score={result.bugIdentification} max={50} />
+          <RubricRow label="Explanation quality" score={result.explanation} max={50} />
           <div className="explain-box">
-            <p><strong>Bug match:</strong> {result.bugScore}/50 — {result.bugScore >= 50 ? 'Correctly identified!' : `Expected: ${BUG_LABELS[scenario.bugType]}`}</p>
-            <p className="mt-2"><strong>Explanation grade:</strong> {result.explanationScore}/50 — {result.feedback}</p>
+            <p><strong>Bug match:</strong> {result.bugIdentification}/50 — {result.bugIdentification >= 50 ? 'Correctly identified!' : `Expected: ${BUG_LABELS[scenario.bugType]}`}</p>
+            <p className="mt-2"><strong>Explanation grade:</strong> {result.explanation}/50 — {result.feedback}</p>
             <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200">
               <strong className="text-green-700">Corrected Query:</strong>
               <pre className="mt-2 text-sm font-mono overflow-x-auto text-black">{scenario.correctedQuery}</pre>

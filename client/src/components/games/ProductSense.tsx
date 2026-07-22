@@ -30,7 +30,7 @@ export default function ProductSenseGame({ onComplete }: Props) {
     const data = await generate({
       system: 'You create product sense questions with real constraints — limited eng capacity, a competitive threat, a timeline.',
       prompt: `Generate a product design question. Include explicit constraints (limited eng, a competitive threat, a timeline). Output JSON:
-{"prompt":"the question with constraints stated clearly","rubric":"grading rubric for scoring","idealPoints":["point 1","point 2","point 3","point 4"]}`
+{"prompt":"the question with constraints stated clearly","rubric":"grading rubric","idealPoints":["point 1","point 2","point 3","point 4"]}`
     });
     if (data) setScenario(data);
   }
@@ -40,7 +40,7 @@ export default function ProductSenseGame({ onComplete }: Props) {
     setPhase('pushback');
     const data = await generate({
       system: 'You are a skeptical interviewer. Identify the weakest part of their answer and push back with one hard follow-up question.',
-      prompt: `Feature prompt: "${scenario.prompt}". Player's answer: """${firstAnswer}""". Generate a skeptical follow-up question targeting the weakest part of their answer. Output JSON: {"followUp":"one specific hard question"}`
+      prompt: `Feature prompt: "${scenario.prompt}". Player's answer: """${firstAnswer}""". Generate a skeptical follow-up targeting the weakest part. JSON: {"followUp":"one specific hard question"}`
     });
     if (data) setSkepticPushback(data.followUp || 'How would you measure whether this actually worked?');
     else setSkepticPushback('How would you measure whether this actually worked?');
@@ -55,7 +55,7 @@ export default function ProductSenseGame({ onComplete }: Props) {
     const secondWords = secondAnswer.split(/\s+/).filter(Boolean).length;
 
     const hasUserNeed = /user|need|pain|frustrat|problem/i.test(firstAnswer);
-    const hasMetrics = /metric|measure|success|kpi|xp|rpm|ltv|retention|conversion|engagement/i.test(firstAnswer);
+    const hasMetrics = /metric|measure|success|kpi|ltv|retention|conversion|engagement/i.test(firstAnswer);
     const hasTradeoffs = /trade.?off|cost|risk|downside|limit|compete|priority|scope|effort|complexity|spend|decision|weigh|balance/i.test(firstAnswer);
     const hasConstraints = /eng(ineering)?|capacity|time|team|budget|resourc/i.test(firstAnswer);
 
@@ -74,13 +74,15 @@ export default function ProductSenseGame({ onComplete }: Props) {
     if (!hasMetrics) missing.push('metrics/success measurement');
     if (secondWords < 10) missing.push('a substantive pushback response');
 
+    const top3Ideas = scenario.idealPoints.slice(0, 3).map((p, i) => `${i + 1}. ${p}`).join('. ');
+
     let debrief = '';
     if (missing.length === 0) {
-      debrief = `Strong answer across all dimensions. You covered user needs, trade-offs, metrics, and addressed the pushback effectively. ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
+      debrief = `Strong answer across all dimensions. You anchored on user needs, weighed trade-offs against the stated constraints, and defined success metrics. Under pushback, you held your position with evidence. A senior PM would also consider: ${top3Ideas}. That breadth — from user pain to measurement — is what separates good product sense from great.`;
     } else if (missing.length <= 2) {
-      debrief = `Good foundation. To strengthen: include ${missing.join(' and ')} in your answer. A top response would also reference the specific constraint (engineering capacity, competitive threat, timeline). ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
+      debrief = `Good foundation. Your response shows product instinct, but to reach senior-level rigor, explicitly address ${missing.join(' and ')}. The best answers to this prompt connect the "why" (user need) to the "so what" (metric move) to the "at what cost" (trade-off). Consider: ${top3Ideas}`;
     } else {
-      debrief = `Your answer was noted but needs more depth. Key missing elements: ${missing.join(', ')}. The rubric mentions: ${scenario.rubric}. ${scenario.idealPoints.map((p, i) => `Idea ${i + 1}: ${p}`).join('. ')}`;
+      debrief = `Your answer has a starting point but needs more structure. Key gaps: ${missing.join(', ')}. A sharp PM would reframe this as: given the constraint, what's the smallest experiment that validates the user need? Strong product sense isn't about having all the answers — it's about asking the right questions. Rubric context: ${scenario.rubric}`;
     }
 
     return { problemFraming: Math.min(5, problemFraming), userEmpathy: Math.min(5, userEmpathy), tradeoffs: Math.min(5, tradeoffs), metrics: Math.min(5, metrics), handledPushback: Math.min(5, handledPushback), judgmentScore, debrief };
@@ -88,7 +90,6 @@ export default function ProductSenseGame({ onComplete }: Props) {
 
   async function handleSecondSubmit() {
     if (!scenario) return;
-    // Compute grade synchronously BEFORE setting phase, so grade is available on next render
     const g = computeGrade();
     setGrade(g);
     setPhase('done');
@@ -142,7 +143,13 @@ export default function ProductSenseGame({ onComplete }: Props) {
           <RubricRow label="Trade-offs" score={grade.tradeoffs} max={5} />
           <RubricRow label="Metrics thinking" score={grade.metrics} max={5} />
           <RubricRow label="Handled pushback" score={grade.handledPushback} max={5} />
-          <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}><p className="text-sm">{grade.debrief}</p></div>
+          <div className="panel mt-4" style={{ background: 'var(--paper-alt)' }}>
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: 'var(--ink-soft)' }}>What strong answers look like</p>
+            {scenario.idealPoints.map((p, i) => (
+              <p key={i} className="text-sm mb-1">• {p}</p>
+            ))}
+            <p className="text-sm mt-3">{grade.debrief}</p>
+          </div>
           <button onClick={loadScenario} className="btn mt-5" disabled={loading}>{loading ? '…' : 'Next Question →'}</button>
         </div>
       )}
