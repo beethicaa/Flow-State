@@ -41,14 +41,13 @@ export default function StandoffGame({ onComplete }: Props) {
 Ensure turn 2 has at least one high-trust option that is trulyGood=false (placating).`
     });
     if (data) {
-      // Shuffle options per turn and strip trulyGood
       const turns = (data.turns as Turn[]).map((t: any) => {
         const raw = t.options as RawOption[];
         const shuffled = [...raw].sort(() => Math.random() - 0.5);
         return {
           prompt: t.prompt,
           options: shuffled.map((o: RawOption) => ({ line: o.line, trustDelta: o.trustDelta })),
-          optionsRaw: raw // keep for grading
+          optionsRaw: raw
         };
       });
       setScenario({ ...data, turns } as Scenario);
@@ -69,21 +68,50 @@ Ensure turn 2 has at least one high-trust option that is trulyGood=false (placat
     }
   }
 
+  function localGrade(finalTrust: number, fullTranscript: string[]): Grade {
+    if (!scenario) {
+      return { deEscalation: 15, transparency: 15, outcome: 15, judgmentScore: 45, debrief: 'Your conversation was logged.' };
+    }
+
+    const transcriptText = fullTranscript.join(' ').toLowerCase();
+
+    // Check if they addressed the real concern vs just placated
+    const addressedConcern = /understand|hear|let's|work together|what if|can we|suggest|propose|solve|address|help|support|resource|timeline|priority|concern/i.test(transcriptText);
+    const wasPlacating = /absolutely|you're right|i'll tell|no problem|we can do|sure thing|whatever you say/i.test(transcriptText) && !addressedConcern;
+
+    // Check for de-escalation tactics
+    const hasDeEscalation = /let's|together|work with|understand|hear you|acknowledge|valid|reasonable|appreciate/i.test(transcriptText);
+    
+    // Check for transparency (not hiding info)
+    const hasTransparency = /explain|transparent|honest|trade-off|constraint|limit|reality|honest/i.test(transcriptText);
+    
+    // Check outcome orientation
+    const hasOutcome = /next step|action|plan|follow up|commit|deliver|timeline|date|deadline/i.test(transcriptText);
+
+    const deEscalation = hasDeEscalation ? 28 : 12;
+    const transparency = hasTransparency ? 28 : 12;
+    const outcome = hasOutcome && addressedConcern ? 28 : hasOutcome ? 18 : 10;
+    const judgmentScore = deEscalation + transparency + outcome;
+
+    let debrief = '';
+    if (addressedConcern && !wasPlacating && hasOutcome) {
+      debrief = `Strong communication. You navigated ${scenario.stakeholder}'s opening tension and surfaced the real concern: "${scenario.underlyingConcern}". Ending at ${finalTrust}% trust shows you balanced empathy with accountability. A senior PM doesn't just smooth edges — they convert tension into a concrete next step.`;
+    } else if (addressedConcern) {
+      debrief = `You made progress with ${scenario.stakeholder} by acknowledging their position. The underlying concern was "${scenario.underlyingConcern}". To be more effective, pair empathy with a concrete outcome: what specifically will happen next, by when, and with whose agreement?`;
+    } else if (wasPlacating) {
+      debrief = `Careful — you placated ${scenario.stakeholder} without addressing the real issue. Their underlying concern is: "${scenario.underlyingConcern}". High trust from placating is fragile; it drops when the promised deliverable doesn't materialize. A sharp PM validates the emotion but redirects to the actual problem.`;
+    } else {
+      debrief = `Your conversation with ${scenario.stakeholder} was noted. The real issue beneath their opening line: "${scenario.underlyingConcern}". A strong PM would have used the first turn to acknowledge their position, then steered toward the actual blocker. Ending trust: ${finalTrust}%.`;
+    }
+
+    return { deEscalation, transparency, outcome, judgmentScore, debrief };
+  }
+
   async function gradeSubmission(finalTrust: number, fullTranscript: string[]) {
     if (!scenario) return;
-    const data = await generate({
-      pool: 'grade',
-      system: 'You evaluate PM stakeholder communication. Critique whether they addressed the real concern or just placated.',
-      prompt: `Underlying concern: "${scenario.underlyingConcern}". Full transcript: ${fullTranscript.map((l, i) => `Turn ${i}: ${l}`).join(' | ')}. Final trust: ${finalTrust}/100.
-Output JSON: {"deEscalation":0-33,"transparency":0-33,"outcome":0-33,"judgmentScore":<sum>,"debrief":"2-3 sentences on if they addressed the real concern or just placated"}`
-    });
-    if (data) {
-      setGrade(data);
-      onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'communication');
-    } else {
-      setGrade({ deEscalation: 15, transparency: 15, outcome: 15, judgmentScore: 45, debrief: 'Your conversation was logged. A strong PM surfaces the real concern rather than just smoothing tension.' });
-      onComplete(18, 'communication');
-    }
+    const g = localGrade(finalTrust, fullTranscript);
+    setGrade(g);
+    onComplete(Math.round(g.judgmentScore * 0.4), 'communication');
   }
 
   if (loading && !scenario) return <LoadingState message="Generating scenario…" />;

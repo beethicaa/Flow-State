@@ -80,6 +80,10 @@ export default function PrioritizeGame({ onComplete }: Props) {
 
     const judgmentScore = tradeoffAwareness + politicalRealism + clarity;
 
+    const itemMap = new Map(scenario.items.map(i => [i.id, i]));
+    const top3 = order.slice(0, 3).map(id => itemMap.get(id)?.title || id).join(', ');
+    const bottom2 = order.slice(-2).map(id => itemMap.get(id)?.title || id).join(' and ');
+
     const missing: string[] = [];
     if (!hasHiddenCost) missing.push('hidden costs/risks of items');
     if (!hasConstraint) missing.push('the constraint (capacity, timeline)');
@@ -88,11 +92,11 @@ export default function PrioritizeGame({ onComplete }: Props) {
 
     let debrief = '';
     if (missing.length === 0) {
-      debrief = `Strong prioritization. You weighed hidden costs, constraints, stakeholders, and business impact. ${scenario.strongRankingLooksLike}`;
+      debrief = `Strong prioritization. Leading with ${top3} shows you're weighing impact and urgency. ${scenario.strongRankingLooksLike} You also demonstrated political realism by acknowledging stakeholder dynamics and financial stakes — that's what separates a roadmap from a wish list.`;
     } else if (missing.length <= 2) {
-      debrief = `Good start. To strengthen, consider: ${missing.join(' and ')}. ${scenario.strongRankingLooksLike}`;
+      debrief = `Good foundation. Your top choices (${top3}) suggest reasonable judgment, but to strengthen your case, explicitly address ${missing.join(' and ')}. The best PMs don't just rank features — they explain WHY the bottom of the backlog can wait. ${bottom2} should have clear deferral rationale. ${scenario.strongRankingLooksLike}`;
     } else {
-      debrief = `Your ranking was noted but needs more depth. Key gaps: ${missing.join(', ')}. ${scenario.strongRankingLooksLike}`;
+      debrief = `Your ranking was noted but needs more depth. Key gaps: ${missing.join(', ')}. A senior PM would frame this as: given ${scenario.constraint}, here's what we delay, why, and what could change our mind. ${scenario.strongRankingLooksLike}`;
     }
 
     return { tradeoffAwareness, politicalRealism, clarity, judgmentScore, debrief };
@@ -104,25 +108,10 @@ export default function PrioritizeGame({ onComplete }: Props) {
       alert('Please write at least 6 words explaining your rationale.');
       return;
     }
+    const g = computeGrade();
     setSubmitted(true);
-    const data = await generate({
-      pool: 'grade',
-      system: 'You evaluate how PMs prioritize under constraints.',
-      prompt: `Stakes: "${scenario.stakes}". Constraint: "${scenario.constraint}".
-Strong ranking looks like: "${scenario.strongRankingLooksLike}".
-Items: ${scenario.items.map(i => `${i.id}: ${i.title} (${i.desc}, hidden cost: ${i.hiddenCost})`).join('; ')}.
-Player's order: ${order.map((id, i) => `${i + 1}. ${scenario.items.find(x => x.id === id)?.title}`).join(' → ')}.
-Player's rationale: """${rationale}"""
-Output JSON: {"tradeoffAwareness":0-33,"politicalRealism":0-33,"clarity":0-33,"judgmentScore":<sum>,"debrief":"2-3 sentences noting which hidden costs they seem to have missed"}`
-    });
-    if (data && typeof data.judgmentScore === 'number') {
-      setGrade(data);
-      onComplete(Math.round((data.judgmentScore || 50) * 0.4), 'execution');
-    } else {
-      const g = computeGrade();
-      setGrade(g);
-      onComplete(Math.round(g.judgmentScore * 0.4), 'execution');
-    }
+    setGrade(g);
+    onComplete(Math.round((g.judgmentScore || 50) * 0.4), 'execution');
   }
 
   if (loading && !scenario) return <LoadingState message="Generating scenario…" />;

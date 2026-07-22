@@ -55,10 +55,58 @@ export default function GuesstimateGame({ onComplete }: Props) {
     if (data) setScenario(data);
   }
 
+  function localGrade(): Grade {
+    if (!scenario || !guess || !method) {
+      return { methodQuality: 'shallow', note: 'Please complete all sections.', numericScore: 0, methodScore: 0, judgmentScore: 0 };
+    }
+
+    const numeric = Math.abs(parseFloat(guess) - scenario.referenceAnswer);
+    const ratio = numeric / scenario.referenceAnswer;
+    const numericScore = ratio < 0.1 ? 40 : ratio < 0.5 ? 25 : ratio < 1 ? 15 : 5;
+
+    const methodWords = method.split(/\s+/).filter(Boolean).length;
+    const hasBreakdown = /breakdown|segment|assumption|multiply|divide|population|penetration|frequency|average|per/i.test(method);
+    const hasSanityCheck = /sanity|order of magnitude|range|roughly|about|estimate/i.test(method);
+    const hasDataSource = /source|data|study|report|statistics|census|industry/i.test(method);
+
+    let methodScore = 0;
+    let methodQuality: 'shallow' | 'structured' | 'rigorous' = 'shallow';
+
+    if (methodWords >= 25 && hasBreakdown && hasSanityCheck) {
+      methodScore = 55;
+      methodQuality = 'rigorous';
+    } else if (methodWords >= 15 && hasBreakdown) {
+      methodScore = 42;
+      methodQuality = 'structured';
+    } else if (methodWords >= 8) {
+      methodScore = 28;
+      methodQuality = 'shallow';
+    } else {
+      methodScore = 15;
+    }
+
+    if (hasDataSource) methodScore = Math.min(60, methodScore + 5);
+
+    const judgmentScore = numericScore + methodScore;
+
+    let note = '';
+    const ratioPct = ratio > 1 ? `${ratio.toFixed(1)}x off` : `${(ratio * 100).toFixed(0)}% off`;
+    if (methodQuality === 'rigorous') {
+      note = `Your method is solid — you broke the problem into components with clear assumptions. Your guess was ${ratioPct} from the reference answer (${scenario.referenceAnswer.toLocaleString()}). Even if the number is slightly off, the rigor of your approach is what matters. A senior PM would refine the key drivers and sanity-check against known benchmarks.`;
+    } else if (methodQuality === 'structured') {
+      note = `You showed structured thinking by identifying the key variables, but your breakdown could go deeper. Your guess was ${ratioPct} from the reference answer (${scenario.referenceAnswer.toLocaleString()}). To make this rigorous, add a sanity check and cite where your base numbers come from.`;
+    } else {
+      note = `Your reasoning needs more structure. A good Fermi estimate explicitly breaks the problem into segments (e.g. population × penetration rate × frequency), states assumptions, and sanity-checks the result. Your guess was ${ratioPct} from the reference answer (${scenario.referenceAnswer.toLocaleString()}). ${scenario.referenceMethod}`;
+    }
+
+    return { methodQuality, note, numericScore, methodScore, judgmentScore };
+  }
+
   async function handleSubmit() {
     if (!scenario || !guess || !method) return;
     setSubmitted(true);
 
+    // Try AI grading first
     const numeric = Math.abs(parseFloat(guess) - scenario.referenceAnswer);
     const ratio = numeric / scenario.referenceAnswer;
     const numericScore = ratio < 0.1 ? 40 : ratio < 0.5 ? 25 : ratio < 1 ? 15 : 5;
@@ -78,13 +126,14 @@ Output JSON:
   "judgmentScore": <sum of numericScore + methodScore, 0-100>
 }`
     });
-    if (gradeData) {
+
+    if (gradeData && gradeData.judgmentScore) {
       setGrade(gradeData);
-      onComplete(Math.round((gradeData.judgmentScore || 50) * 0.4), 'analytics');
+      onComplete(Math.round(gradeData.judgmentScore * 0.4), 'analytics');
     } else {
-      const js = numericScore + 30;
-      setGrade({ methodQuality: 'structured', note: 'Your approach was noted.', numericScore, methodScore: 30, judgmentScore: js });
-      onComplete(Math.round(js * 0.4), 'analytics');
+      const g = localGrade();
+      setGrade(g);
+      onComplete(Math.round(g.judgmentScore * 0.4), 'analytics');
     }
   }
 
