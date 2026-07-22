@@ -41,13 +41,9 @@ Vary whether the estimate is justified or padded.${isBoss ? ' Make this delibera
     const lower = answer.toLowerCase();
     const words = answer.split(/\s+/).filter(Boolean).length;
 
-    // Technical curiosity: did they ask about the estimate?
-    const hasTechCuriosity = /why|how|what makes|assumption|breakdown|margin|pad|buffer|risk|complex|uncertain/i.test(lower);
-    // Collaborative tone: are they working WITH engineering?
-    const hasCollaborative = /together|collaborate|partner|work with|let's|we could|suggest|propose|discuss|align|explore|understand|help/i.test(lower);
-    // Scope judgment: do they consider trade-offs?
-    const hasScopeJudgment = /scope|cut|phase|mvp|minimum|v1|trade.?off|alternative|option|split|priority|essential|core|defer/i.test(lower);
-    // Stakes awareness
+    const hasTechCuriosity = /why|how|what makes|assumption|breakdown|margin|pad|buffer|risk|complex|uncertain|dependency/i.test(lower);
+    const hasCollaborative = /together|collaborate|partner|work with|let's|we could|suggest|propose|discuss|align|explore|understand|help|appreciate/i.test(lower);
+    const hasScopeJudgment = /scope|cut|phase|mvp|minimum|v1|trade.?off|alternative|option|split|priority|essential|core|defer|must.?have|nice.?to/i.test(lower);
     const hasStakes = /stake|deadline|board|customer|investor|revenue|impact|critical|important|urgent/i.test(lower);
 
     const technicalCuriosity = hasTechCuriosity ? 28 : 12;
@@ -56,18 +52,21 @@ Vary whether the estimate is justified or padded.${isBoss ? ' Make this delibera
     const judgmentScore = Math.min(100, technicalCuriosity + collaborativeTone + scopeJudgment);
 
     const missing: string[] = [];
-    if (!hasTechCuriosity) missing.push('question the estimate');
+    if (!hasTechCuriosity) missing.push('question the estimate assumptions');
     if (!hasCollaborative) missing.push('collaborative framing');
     if (!hasScopeJudgment) missing.push('scope negotiation');
     if (!hasStakes) missing.push('acknowledge the stakes');
 
+    const topGap = missing[0] || 'none';
+    const est = data.engineerEstimate;
+
     let debrief = '';
     if (missing.length === 0) {
-      debrief = `Strong response. You questioned the estimate, maintained a collaborative tone, negotiated scope, and acknowledged the stakes. ${data.strongAnswerLooksLike}`;
+      debrief = `Strong response to "${data.ask}". You probed the ${est} estimate without busting trust, negotiated scope instead of just accepting the timeline, and anchored on what matters given ${data.stakes}. A senior PM would pair this with a written "decision memo" so the compromise is preserved across org noise. ${data.strongAnswerLooksLike}`;
     } else if (missing.length <= 2) {
-      debrief = `Good start. To strengthen, ${missing.join(' and ')}. ${data.strongAnswerLooksLike}`;
+      debrief = `Good instincts on this ask, but your response still leans on "${topGap}" being implicit. Given the estimate is "${est}" and the stakes are ${data.stakes}, a sharp PM makes the trade-offs visible: here's what we cut, here's what we defer, here's what could change the plan. ${data.strongAnswerLooksLike}`;
     } else {
-      debrief = `Your response needs more depth. Key gaps: ${missing.join(', ')}. ${data.strongAnswerLooksLike}`;
+      debrief = `Your response to "${data.ask}" needs more structure. The engineering estimate is "${est}" and ${data.engineerReasoning}. Key gaps: ${missing.join(', ')}. A senior PM reframes impossible asks as choices: "We can hit the deadline if we defer X and Y, or we extend the timeline and ship Z now." ${data.strongAnswerLooksLike}`;
     }
 
     return { technicalCuriosity, collaborativeTone, scopeJudgment, judgmentScore, debrief };

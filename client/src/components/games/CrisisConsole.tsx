@@ -103,12 +103,16 @@ export default function CrisisConsoleGame({ onComplete }: Props) {
     const comm = isTimeout ? 0 : commPick === scenario.bestCommsId ? 25 : 10;
     const speed = isTimeout ? 0 : 30;
     const js = td + comm + speed;
+    
+    const signalsList = scenario.signals.map((s, i) => `Signal ${i + 1}: ${s}`).join('; ');
+    const debrief = isTimeout
+      ? `Indecision has a cost. In real incidents, a wrong call at the right time is often better than the right call too late. For this incident: ${scenario.incident}. Blast radius: ${scenario.blastRadius}. The signals were: ${signalsList}. Your team needed direction.`
+      : `For this P0 — ${scenario.incident} with blast radius ${scenario.blastRadius} — the key was triage under ambiguity. ${scenario.explanation} The signals you weighed: ${signalsList}. A senior PM would also pre-stage a status update for stakeholders while the tech team investigates, so communication and execution happen in parallel.`;
+    
     setGrade({
       techDecision: td, communication: comm, speed,
       judgmentScore: js,
-      debrief: isTimeout
-        ? 'Indecision has a cost. In real incidents, a wrong call at the right time is often better than the right call too late. Your team needed direction.'
-        : scenario.explanation
+      debrief
     });
     const xp = Math.round(js * 0.4);
     onComplete(xp, 'execution');
